@@ -1,5 +1,5 @@
-import { OpenAI } from "openai";
 import Constants from "expo-constants";
+import { OpenAI } from "openai";
 
 const OPENAI_API_KEY = Constants.expoConfig?.extra?.openAIApiKey;
 

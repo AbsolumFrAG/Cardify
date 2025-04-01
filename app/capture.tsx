@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useContent } from "@/context/ContentContext";
 import { useFlashcards } from "@/context/FlashcardContext";
-import { Camera, CameraView } from "expo-camera";
+import { Camera, CameraType, CameraView } from "expo-camera";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 export default function CaptureScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [facing] = useState<CameraType>("back");
   const cameraRef = useRef<CameraView | null>(null);
   const { addFlashcard } = useFlashcards();
   const { addContent } = useContent();
@@ -35,36 +36,46 @@ export default function CaptureScreen() {
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        setProcessing(true);
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7,
-        });
-        if (photo && photo.uri) {
-          await processImage(photo.uri);
-        } else {
-          throw new Error("Photo capture failed.");
+        if (cameraRef.current instanceof CameraView) {
+          // Set processing state to show overlay (not replacing the camera)
+          setProcessing(true);
+          const photo = await cameraRef.current.takePictureAsync();
+
+          if (photo && photo.uri) {
+            await processImage(photo.uri);
+          } else {
+            throw new Error("Photo non capturée correctement");
+          }
         }
       } catch (error) {
-        console.error("Erreur lors de la prise de photo:", error);
-        Alert.alert(
-          "Erreur",
-          "Impossible de prendre une photo. Veuillez réessayer."
-        );
+        console.error("Erreur prise photo:", error);
+        Alert.alert("Erreur", "Échec de la capture, réessayez.");
         setProcessing(false);
       }
+    } else {
+      Alert.alert("Erreur", "La caméra n'est pas prête.");
     }
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
 
-    if (!result.canceled) {
-      setProcessing(true);
-      await processImage(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setProcessing(true);
+        await processImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la sélection d'image:", error);
+      Alert.alert(
+        "Erreur",
+        "Impossible de sélectionner une image. Veuillez réessayer."
+      );
+      setProcessing(false);
     }
   };
 
@@ -122,27 +133,42 @@ export default function CaptureScreen() {
       console.error("Erreur lors du traitement de l'image:", error);
       Alert.alert(
         "Erreur",
-        "Impossible de traiter l'image. Veuillez réessayer.",
-        [{ text: "OK", onPress: () => setProcessing(false) }]
+        "Impossible de traiter l'image. Veuillez réessayer."
       );
+      setProcessing(false);
     }
   };
 
   if (hasPermission === null) {
+    // Camera permissions are still loading
     return (
       <View style={styles.container}>
-        <ThemedText>Demande d'autorisation...</ThemedText>
+        <ActivityIndicator size="large" color="#0a7ea4" />
+        <ThemedText style={styles.loadingText}>
+          Chargement de la caméra...
+        </ThemedText>
       </View>
     );
   }
 
   if (hasPermission === false) {
+    // Camera permissions are not granted yet
     return (
       <View style={styles.container}>
         <ThemedText style={styles.errorText}>
-          Accès à la caméra refusé. Veuillez activer les permissions de caméra
-          dans les paramètres.
+          Accès à la caméra refusé. Veuillez activer les permissions de caméra.
         </ThemedText>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={async () => {
+            const { status } = await Camera.requestCameraPermissionsAsync();
+            setHasPermission(status === "granted");
+          }}
+        >
+          <ThemedText style={styles.permissionButtonText}>
+            Autoriser l'accès à la caméra
+          </ThemedText>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.pickButton} onPress={pickImage}>
           <ThemedText style={styles.pickButtonText}>
             Sélectionner une image de la galerie
@@ -154,50 +180,70 @@ export default function CaptureScreen() {
 
   return (
     <View style={styles.container}>
-      {processing ? (
-        <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color="#0a7ea4" />
-          <ThemedText style={styles.processingText}>
-            Traitement de l'image et extraction du texte...
-          </ThemedText>
+      <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+        <View style={styles.overlay}>
+          <View style={styles.cameraGuidelines} />
         </View>
-      ) : (
-        <>
-          <CameraView style={styles.camera} facing={"back"} ref={cameraRef}>
-            <View style={styles.overlay}>
-              <View style={styles.cameraGuidelines} />
-            </View>
-          </CameraView>
+      </CameraView>
 
-          <View style={styles.controls}>
-            <TouchableOpacity style={styles.pickButton} onPress={pickImage}>
-              <IconSymbol name="photo" size={24} color="white" />
-              <ThemedText style={styles.pickButtonText}>Galerie</ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePicture}
-            >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => router.back()}
-            >
-              <IconSymbol name="xmark" size={24} color="white" />
-              <ThemedText style={styles.pickButtonText}>Annuler</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.instructionContainer}>
-            <ThemedText style={styles.instructionText}>
-              Prenez une photo claire de vos notes de cours
+      {/* Processing overlay - shown on top of camera instead of replacing it */}
+      {processing && (
+        <View style={styles.processingOverlay}>
+          <View style={styles.processingCard}>
+            <ActivityIndicator size="large" color="#0a7ea4" />
+            <ThemedText style={styles.processingText}>
+              Traitement de l'image et extraction du texte...
             </ThemedText>
           </View>
-        </>
+        </View>
       )}
+
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={pickImage}
+          disabled={processing}
+        >
+          <IconSymbol
+            name="photo"
+            size={24}
+            color={processing ? "rgba(255,255,255,0.5)" : "white"}
+          />
+          <ThemedText
+            style={[styles.buttonText, processing && styles.disabledText]}
+          >
+            Galerie
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.captureButton, processing && styles.disabledButton]}
+          onPress={takePicture}
+          disabled={processing}
+        >
+          <View style={styles.captureButtonInner} />
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={styles.cancelButton}
+        onPress={() => router.back()}
+        disabled={processing}
+      >
+        <ThemedText
+          style={[styles.cancelButtonText, processing && styles.disabledText]}
+        >
+          Annuler
+        </ThemedText>
+      </TouchableOpacity>
+
+      <View style={styles.instructionContainer}>
+        <ThemedText style={styles.instructionText}>
+          {processing
+            ? "Traitement en cours, veuillez patienter..."
+            : "Prenez une photo claire de vos notes de cours"}
+        </ThemedText>
+      </View>
     </View>
   );
 }
@@ -222,6 +268,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.5)",
     borderRadius: 8,
   },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  processingCard: {
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderRadius: 12,
+    padding: 20,
+    width: "80%",
+    alignItems: "center",
+  },
   controls: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -243,15 +303,28 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "white",
   },
-  pickButton: {
+  controlButton: {
     alignItems: "center",
+    width: 80,
   },
-  pickButtonText: {
+  buttonText: {
     color: "white",
     marginTop: 5,
+    fontSize: 14,
   },
   cancelButton: {
     alignItems: "center",
+    padding: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  cancelButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
+  pickButtonText: {
+    color: "#0a7ea4",
+    fontWeight: "600",
+    marginVertical: 10,
   },
   instructionContainer: {
     padding: 15,
@@ -276,5 +349,36 @@ const styles = StyleSheet.create({
     color: "white",
     margin: 20,
     textAlign: "center",
+  },
+  loadingText: {
+    color: "white",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  permissionButton: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  permissionButtonText: {
+    color: "white",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  pickButton: {
+    backgroundColor: "white",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 20,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    opacity: 0.5,
   },
 });
