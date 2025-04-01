@@ -2,6 +2,7 @@ import "dotenv/config";
 
 export default {
   expo: {
+    owner: "cardify",
     name: "Cardify",
     slug: "cardify",
     version: "1.0.0",
@@ -58,7 +59,7 @@ export default {
       pineconeEnvironment: process.env.PINECONE_ENVIRONMENT,
       pineconeIndex: process.env.PINECONE_INDEX,
       eas: {
-        projectId: "d4ea373d-67de-4926-a540-c9b021f773c3",
+        projectId: "8ee92364-5ea8-419c-b26b-43b55c11ccb4",
       },
     },
     experiments: {
