@@ -1,10 +1,24 @@
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { useTheme } from "@/context/ThemeContext";
 import { Flashcard } from "@/types/flashcard";
 import { formatRelativeDate } from "@/utils/dateUtils";
-import { useState } from "react";
-import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useState } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
-import { ThemedView } from "./ThemedView";
 import { IconSymbol } from "./ui/IconSymbol";
+
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 interface FlashcardItemProps {
   flashcard: Flashcard;
@@ -17,182 +31,243 @@ export function FlashcardItem({
   onEdit,
   onDelete,
 }: FlashcardItemProps) {
+  const { colors, isDark } = useTheme();
   const [isFlipped, setIsFlipped] = useState(false);
-  const [animation] = useState(new Animated.Value(0));
+  const rotate = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  // Animation à l'apparition
+  useEffect(() => {
+    scale.value = withSequence(
+      withTiming(0.95, { duration: 10 }),
+      withTiming(1, { duration: 400, easing: Easing.elastic(1.2) })
+    );
+  }, []);
 
   const flipCard = () => {
-    Animated.spring(animation, {
-      toValue: isFlipped ? 0 : 1,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: true,
-    }).start(() => {
-      setIsFlipped(!isFlipped);
+    const newValue = isFlipped ? 0 : 1;
+    rotate.value = withTiming(newValue, {
+      duration: 400,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     });
+    setIsFlipped(!isFlipped);
   };
 
-  const frontInterpolate = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "180deg"],
+  const frontAnimatedStyle = useAnimatedStyle(() => {
+    const rotateValue = interpolate(rotate.value, [0, 1], [0, 180]);
+
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotateValue}deg` },
+        { scale: scale.value },
+      ],
+      opacity: rotate.value > 0.5 ? 0 : 1,
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backfaceVisibility: "hidden",
+    };
   });
 
-  const backInterpolate = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["180deg", "360deg"],
+  const backAnimatedStyle = useAnimatedStyle(() => {
+    const rotateValue = interpolate(rotate.value, [0, 1], [180, 360]);
+
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotateValue}deg` },
+        { scale: scale.value },
+      ],
+      opacity: rotate.value < 0.5 ? 0 : 1,
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backfaceVisibility: "hidden",
+    };
   });
-
-  const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
-  };
-
-  const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
-  };
 
   // Déterminer la couleur de la boîte
-  let boxColor;
-  switch (flashcard.boxLevel) {
-    case 1:
-      boxColor = "#ff8a80";
-      break; // Rouge clair
-    case 2:
-      boxColor = "#ffab91";
-      break; // Orange clair
-    case 3:
-      boxColor = "#ffe082";
-      break; // Jaune clair
-    case 4:
-      boxColor = "#c5e1a5";
-      break; // Vert clair
-    case 5:
-      boxColor = "#a5d6a7";
-      break; // Vert
-    default:
-      boxColor = "#e0e0e0";
-  }
+  const boxColor = colors.boxColors[flashcard.boxLevel as keyof typeof colors.boxColors];
 
   // Vérifier si la carte est due
   const isDue = flashcard.nextReviewDate <= new Date();
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity activeOpacity={0.9} onPress={flipCard}>
-        <Animated.View style={[styles.card, frontAnimatedStyle]}>
-          <ThemedView style={styles.cardContent}>
-            <ThemedView style={styles.cardHeader}>
-              <ThemedView
-                style={[styles.boxIndicator, { backgroundColor: boxColor }]}
-              >
-                <ThemedText style={styles.boxText}>
-                  Boîte {flashcard.boxLevel}
-                </ThemedText>
-              </ThemedView>
-              {isDue && (
-                <ThemedView style={styles.dueIndicator}>
-                  <IconSymbol
-                    name="exclamationmark.circle.fill"
-                    size={16}
-                    color="#ff3d00"
-                  />
-                  <ThemedText style={styles.dueText}>À réviser</ThemedText>
-                </ThemedView>
-              )}
-            </ThemedView>
-
-            <ThemedText style={styles.cardTitle}>Question</ThemedText>
-            <ThemedText style={styles.cardText}>
-              {flashcard.question}
-            </ThemedText>
-
-            <ThemedView style={styles.cardFooter}>
-              <ThemedText style={styles.dateText}>
-                Créée {formatRelativeDate(flashcard.createdAt)}
-              </ThemedText>
-              <ThemedText style={styles.tapText}>
-                Appuyez pour retourner
-              </ThemedText>
-            </ThemedView>
-          </ThemedView>
-        </Animated.View>
-
-        <Animated.View
-          style={[styles.card, styles.cardBack, backAnimatedStyle]}
+      <View style={styles.cardContainer}>
+        <AnimatedTouchableOpacity
+          activeOpacity={0.9}
+          onPress={flipCard}
+          style={{ width: "100%", height: 180 }}
         >
-          <ThemedView style={styles.cardContent}>
-            <ThemedView style={styles.cardHeader}>
-              <ThemedView
-                style={[styles.boxIndicator, { backgroundColor: boxColor }]}
+          <Animated.View style={[styles.cardSide, frontAnimatedStyle]}>
+            <Card variant={isDark ? "default" : "elevated"} style={styles.card}>
+              <LinearGradient
+                colors={
+                  isDark ? ["#1d2529", "#293238"] : ["#ffffff", "#f5f5f5"]
+                }
+                style={styles.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <ThemedText style={styles.boxText}>
-                  Boîte {flashcard.boxLevel}
-                </ThemedText>
-              </ThemedView>
-              {isDue && (
-                <ThemedView style={styles.dueIndicator}>
-                  <IconSymbol
-                    name="exclamationmark.circle.fill"
-                    size={16}
-                    color="#ff3d00"
-                  />
-                  <ThemedText style={styles.dueText}>À réviser</ThemedText>
-                </ThemedView>
-              )}
-            </ThemedView>
+                <Card.Content style={styles.cardContent}>
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[
+                        styles.boxIndicator,
+                        { backgroundColor: boxColor },
+                      ]}
+                    >
+                      <ThemedText style={styles.boxText}>
+                        Boîte {flashcard.boxLevel}
+                      </ThemedText>
+                    </View>
+                    {isDue && (
+                      <View style={styles.dueIndicator}>
+                        <IconSymbol
+                          name="exclamationmark.circle.fill"
+                          size={16}
+                          color={colors.error}
+                        />
+                        <ThemedText style={styles.dueText}>
+                          À réviser
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
 
-            <ThemedText style={styles.cardTitle}>Réponse</ThemedText>
-            <ThemedText style={styles.cardText}>{flashcard.answer}</ThemedText>
+                  <ThemedText style={styles.cardTitle}>Question</ThemedText>
+                  <ThemedText style={styles.cardText} numberOfLines={3}>
+                    {flashcard.question}
+                  </ThemedText>
 
-            <ThemedView style={styles.cardFooter}>
-              <ThemedText style={styles.dateText}>
-                Prochaine révision:{" "}
-                {formatRelativeDate(flashcard.nextReviewDate)}
-              </ThemedText>
-              <ThemedText style={styles.tapText}>
-                Appuyez pour retourner
-              </ThemedText>
-            </ThemedView>
-          </ThemedView>
-        </Animated.View>
-      </TouchableOpacity>
+                  <View style={styles.cardFooter}>
+                    <ThemedText style={styles.dateText}>
+                      Créée {formatRelativeDate(flashcard.createdAt)}
+                    </ThemedText>
+                    <ThemedText style={styles.tapText}>
+                      Appuyez pour retourner
+                    </ThemedText>
+                  </View>
+                </Card.Content>
+              </LinearGradient>
+            </Card>
+          </Animated.View>
 
-      <ThemedView style={styles.actionButtons}>
-        <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-          <IconSymbol name="pencil" size={18} color="#0a7ea4" />
-          <ThemedText style={styles.editButtonText}>Modifier</ThemedText>
-        </TouchableOpacity>
+          <Animated.View style={[styles.cardSide, backAnimatedStyle]}>
+            <Card
+              variant={isDark ? "default" : "elevated"}
+              style={[styles.card, styles.cardBack]}
+            >
+              <LinearGradient
+                colors={
+                  isDark ? ["#293238", "#1d2529"] : ["#f5f5f5", "#ffffff"]
+                }
+                style={styles.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Card.Content style={styles.cardContent}>
+                  <View style={styles.cardHeader}>
+                    <View
+                      style={[
+                        styles.boxIndicator,
+                        { backgroundColor: boxColor },
+                      ]}
+                    >
+                      <ThemedText style={styles.boxText}>
+                        Boîte {flashcard.boxLevel}
+                      </ThemedText>
+                    </View>
+                    {isDue && (
+                      <View style={styles.dueIndicator}>
+                        <IconSymbol
+                          name="exclamationmark.circle.fill"
+                          size={16}
+                          color={colors.error}
+                        />
+                        <ThemedText style={styles.dueText}>
+                          À réviser
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
 
-        <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
-          <IconSymbol name="trash" size={18} color="#ff3d00" />
-          <ThemedText style={styles.deleteButtonText}>Supprimer</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
+                  <ThemedText style={styles.cardTitle}>Réponse</ThemedText>
+                  <ThemedText style={styles.cardText} numberOfLines={3}>
+                    {flashcard.answer}
+                  </ThemedText>
+
+                  <View style={styles.cardFooter}>
+                    <ThemedText style={styles.dateText}>
+                      Prochaine révision:{" "}
+                      {formatRelativeDate(flashcard.nextReviewDate)}
+                    </ThemedText>
+                    <ThemedText style={styles.tapText}>
+                      Appuyez pour retourner
+                    </ThemedText>
+                  </View>
+                </Card.Content>
+              </LinearGradient>
+            </Card>
+          </Animated.View>
+        </AnimatedTouchableOpacity>
+      </View>
+
+      <View style={styles.actionButtons}>
+        <Button
+          variant="outline"
+          size="small"
+          leftIcon="pencil"
+          onPress={onEdit}
+          style={styles.editButton}
+        >
+          Modifier
+        </Button>
+
+        <Button
+          variant="danger"
+          size="small"
+          leftIcon="trash"
+          onPress={onDelete}
+          style={styles.deleteButton}
+        >
+          Supprimer
+        </Button>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  cardContainer: {
+    height: 180,
+    position: "relative",
+    marginBottom: 8,
+  },
+  cardSide: {
+    width: "100%",
+    height: "100%",
   },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    backfaceVisibility: "hidden",
+    margin: 0,
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+  },
+  cardGradient: {
+    flex: 1,
   },
   cardBack: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    left: 0,
     backgroundColor: "#f9f9f9",
   },
   cardContent: {
-    padding: 16,
+    flex: 1,
+    justifyContent: "space-between",
   },
   cardHeader: {
     flexDirection: "row",
@@ -201,18 +276,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   boxIndicator: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   boxText: {
-    color: "#333",
+    color: "#fff",
     fontSize: 12,
     fontWeight: "600",
   },
   dueIndicator: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   dueText: {
     color: "#ff3d00",
@@ -228,13 +307,14 @@ const styles = StyleSheet.create({
   },
   cardText: {
     fontSize: 16,
-    marginBottom: 20,
-    minHeight: 50,
+    lineHeight: 24,
+    flex: 1,
   },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 12,
   },
   dateText: {
     fontSize: 12,
@@ -248,27 +328,12 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 8,
   },
   editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 8,
-    marginRight: 12,
-  },
-  editButtonText: {
-    color: "#0a7ea4",
-    marginLeft: 4,
-    fontSize: 14,
+    marginRight: 8,
   },
   deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 8,
-  },
-  deleteButtonText: {
-    color: "#ff3d00",
-    marginLeft: 4,
-    fontSize: 14,
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    borderColor: "transparent",
   },
 });

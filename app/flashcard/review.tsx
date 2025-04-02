@@ -1,27 +1,56 @@
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import { useFlashcards } from "@/context/FlashcardContext";
+import { useTheme } from "@/context/ThemeContext";
 import { getDueFlashcards } from "@/services/leitnerSystem";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  Animated,
-  Dimensions,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  SlideInDown,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
+const CARD_HEIGHT = height * 0.45;
 
 export default function ReviewScreen() {
   const { flashcards, reviewFlashcard } = useFlashcards();
+  const { colors, isDark } = useTheme();
   const [dueCards, setDueCards] = useState<Array<any>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [animation] = useState(new Animated.Value(0));
+  const [exitingCard, setExitingCard] = useState<
+    "correct" | "incorrect" | null
+  >(null);
+
+  // Valeurs d'animation
+  const rotate = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  // Animer un bouton de réponse lorsqu'il est pressé
+  const buttonScaleCorrect = useSharedValue(1);
+  const buttonScaleIncorrect = useSharedValue(1);
 
   useEffect(() => {
     const cards = getDueFlashcards(flashcards);
@@ -32,87 +61,171 @@ export default function ReviewScreen() {
     }
   }, [flashcards]);
 
+  // Style animé pour la rotation de la carte
+  const frontAnimatedStyle = useAnimatedStyle(() => {
+    const rotateValue = interpolate(rotate.value, [0, 1], [0, 180]);
+
+    return {
+      transform: [
+        { perspective: 1000 },
+        { scale: scale.value },
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { rotateY: `${rotateValue}deg` },
+      ],
+      opacity: rotate.value > 0.5 ? 0 : 1,
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backfaceVisibility: "hidden",
+    };
+  });
+
+  // Style animé pour le dos de la carte
+  const backAnimatedStyle = useAnimatedStyle(() => {
+    const rotateValue = interpolate(rotate.value, [0, 1], [180, 360]);
+
+    return {
+      transform: [
+        { perspective: 1000 },
+        { scale: scale.value },
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { rotateY: `${rotateValue}deg` },
+      ],
+      opacity: rotate.value < 0.5 ? 0 : 1,
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      backfaceVisibility: "hidden",
+    };
+  });
+
+  // Style animé pour le bouton correct
+  const correctButtonStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScaleCorrect.value }],
+    };
+  });
+
+  // Style animé pour le bouton incorrect
+  const incorrectButtonStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScaleIncorrect.value }],
+    };
+  });
+
+  // Retourner la carte
   const flipCard = () => {
-    setFlipped(!flipped);
-    Animated.spring(animation, {
-      toValue: flipped ? 0 : 1,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
+    const newValue = flipped ? 0 : 1;
+    rotate.value = withTiming(
+      newValue,
+      {
+        duration: 400,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      },
+      () => {
+        runOnJS(setFlipped)(!flipped);
+      }
+    );
   };
 
-  const frontInterpolate = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "180deg"],
-  });
-
-  const backInterpolate = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["180deg", "360deg"],
-  });
-
-  const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
-  };
-
-  const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
-  };
-
+  // Gestion de la réponse
   const handleResponse = async (correct: boolean) => {
     if (dueCards.length === 0) return;
 
-    const currentCard = dueCards[currentIndex];
-    await reviewFlashcard(currentCard.id, correct);
-
-    setFlipped(false);
-    animation.setValue(0);
-
-    if (currentIndex < dueCards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    // Animation de pression du bouton
+    if (correct) {
+      buttonScaleCorrect.value = withSequence(
+        withTiming(0.9, { duration: 100 }),
+        withTiming(1, { duration: 200 })
+      );
     } else {
-      setCompleted(true);
+      buttonScaleIncorrect.value = withSequence(
+        withTiming(0.9, { duration: 100 }),
+        withTiming(1, { duration: 200 })
+      );
     }
-  };
 
-  const restart = () => {
-    const cards = getDueFlashcards(flashcards);
-    setDueCards(cards);
-    setCurrentIndex(0);
-    setCompleted(false);
-    setFlipped(false);
-    animation.setValue(0);
+    // Marquer la direction de sortie de la carte
+    setExitingCard(correct ? "correct" : "incorrect");
+
+    // Animation de sortie de la carte
+    translateX.value = withTiming(
+      correct ? width : -width,
+      { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
+      async () => {
+        const currentCard = dueCards[currentIndex];
+        await reviewFlashcard(currentCard.id, correct);
+
+        if (currentIndex < dueCards.length - 1) {
+          runOnJS(setCurrentIndex)(currentIndex + 1);
+        } else {
+          runOnJS(setCompleted)(true);
+        }
+
+        // Réinitialiser les valeurs pour la prochaine carte
+        translateX.value = 0;
+        rotate.value = 0;
+        runOnJS(setFlipped)(false);
+        runOnJS(setExitingCard)(null);
+      }
+    );
   };
 
   if (completed) {
     return (
       <ThemedView style={styles.completedContainer}>
-        <IconSymbol name="checkmark.circle.fill" size={80} color="#0a7ea4" />
-        <ThemedText type="title" style={styles.completedTitle}>
-          Bravo !
-        </ThemedText>
-        <ThemedText style={styles.completedText}>
-          Vous avez terminé toutes vos révisions pour aujourd'hui.
-        </ThemedText>
-
-        <TouchableOpacity
-          style={styles.homeButton}
-          onPress={() => router.push("/")}
+        <Animated.View
+          style={styles.completedContent}
+          entering={FadeInDown.duration(800).springify()}
         >
-          <ThemedText style={styles.homeButtonText}>
-            Retour à l'accueil
-          </ThemedText>
-        </TouchableOpacity>
+          <View style={styles.completedIconContainer}>
+            <LinearGradient
+              colors={isDark ? ["#0d566e", "#0a7ea4"] : ["#b3e5fc", "#4fc3f7"]}
+              style={styles.completedIconGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.completedIconInner}>
+                <IconSymbol name="checkmark" size={40} color="#FFFFFF" />
+              </View>
+            </LinearGradient>
+          </View>
 
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => router.push("/flashcard/create")}
-        >
-          <ThemedText style={styles.createButtonText}>
-            Créer de nouvelles flashcards
+          <ThemedText type="title" style={styles.completedTitle}>
+            Bravo !
           </ThemedText>
-        </TouchableOpacity>
+
+          <ThemedText style={styles.completedText}>
+            Vous avez terminé toutes vos révisions pour aujourd'hui. Revenez
+            plus tard pour continuer votre progression !
+          </ThemedText>
+
+          <Animated.View entering={FadeIn.delay(300).duration(500)}>
+            <Button
+              variant="primary"
+              leftIcon="house.fill"
+              style={styles.homeButton}
+              onPress={() => router.push("/")}
+              fullWidth
+            >
+              Retour à l'accueil
+            </Button>
+          </Animated.View>
+
+          <Animated.View entering={FadeIn.delay(400).duration(500)}>
+            <Button
+              variant="outline"
+              leftIcon="plus.square.fill"
+              style={styles.createButton}
+              onPress={() => router.push("/flashcard/create")}
+              fullWidth
+            >
+              Créer de nouvelles flashcards
+            </Button>
+          </Animated.View>
+        </Animated.View>
       </ThemedView>
     );
   }
@@ -120,94 +233,192 @@ export default function ReviewScreen() {
   if (dueCards.length === 0) {
     return (
       <ThemedView style={styles.noCardsContainer}>
-        <IconSymbol name="checkmark.circle.fill" size={80} color="#0a7ea4" />
-        <ThemedText type="title" style={styles.noCardsTitle}>
-          Félicitations !
-        </ThemedText>
-        <ThemedText style={styles.noCardsText}>
-          Vous n'avez aucun carte à réviser pour le moment.
-        </ThemedText>
-        <TouchableOpacity
-          style={styles.homeButton}
-          onPress={() => router.push("/")}
+        <Animated.View
+          style={styles.noCardsContent}
+          entering={FadeInDown.duration(800).springify()}
         >
-          <ThemedText style={styles.homeButtonText}>
-            Retour à l'accueil
+          <View style={styles.noCardsIconContainer}>
+            <LinearGradient
+              colors={isDark ? ["#0d566e", "#0a7ea4"] : ["#b3e5fc", "#4fc3f7"]}
+              style={styles.completedIconGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.completedIconInner}>
+                <IconSymbol name="sparkles" size={36} color="#FFFFFF" />
+              </View>
+            </LinearGradient>
+          </View>
+
+          <ThemedText type="title" style={styles.completedTitle}>
+            Félicitations !
           </ThemedText>
-        </TouchableOpacity>
+
+          <ThemedText style={styles.completedText}>
+            Vous n'avez aucune carte à réviser pour le moment. Vous pouvez créer
+            de nouvelles flashcards ou attendre que vos cartes actuelles soient
+            disponibles pour révision.
+          </ThemedText>
+
+          <Animated.View entering={FadeIn.delay(300).duration(500)}>
+            <Button
+              variant="primary"
+              leftIcon="house.fill"
+              style={styles.homeButton}
+              onPress={() => router.push("/")}
+              fullWidth
+            >
+              Retour à l'accueil
+            </Button>
+          </Animated.View>
+        </Animated.View>
       </ThemedView>
     );
   }
 
   const currentCard = dueCards[currentIndex];
+  const progress = (currentIndex + 1) / dueCards.length;
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedView style={styles.progressContainer}>
-        <ThemedText>
+      <Animated.View
+        style={styles.progressContainer}
+        entering={FadeInDown.duration(400)}
+      >
+        <ThemedText style={styles.progressText}>
           Carte {currentIndex + 1} sur {dueCards.length}
         </ThemedText>
-        <ThemedView style={styles.progressBar}>
-          <ThemedView
-            style={[
-              styles.progressFill,
-              { width: `${((currentIndex + 1) / dueCards.length) * 100}%` },
-            ]}
-          />
-        </ThemedView>
-      </ThemedView>
+        <ProgressBar
+          progress={progress}
+          height={8}
+          width="100%"
+          useGradient
+          style={styles.progressBar}
+        />
+      </Animated.View>
 
       <View style={styles.cardContainer}>
-        <TouchableOpacity onPress={flipCard} activeOpacity={0.9}>
-          <Animated.View style={[styles.card, frontAnimatedStyle]}>
-            <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
-              Question
-            </ThemedText>
-            <ThemedText style={styles.cardContent}>
-              {currentCard.question}
-            </ThemedText>
-            <ThemedText style={styles.tapHint}>
-              Appuyez pour voir la réponse
-            </ThemedText>
-          </Animated.View>
+        <TouchableOpacity
+          onPress={flipCard}
+          activeOpacity={0.9}
+          style={styles.cardTouchable}
+        >
+          <View style={styles.cardWrapper}>
+            <Animated.View
+              style={[styles.card, frontAnimatedStyle]}
+              entering={exitingCard ? undefined : SlideInRight.duration(300)}
+              exiting={
+                exitingCard === "correct"
+                  ? SlideOutRight.duration(300)
+                  : SlideOutLeft.duration(300)
+              }
+            >
+              <LinearGradient
+                colors={
+                  isDark ? ["#1d2529", "#293238"] : ["#ffffff", "#f5f5f5"]
+                }
+                style={styles.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Card.Content style={styles.cardContent}>
+                  <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
+                    Question
+                  </ThemedText>
+                  <ThemedText style={styles.cardContentText}>
+                    {currentCard.question}
+                  </ThemedText>
+                  <ThemedText style={styles.tapHint}>
+                    Appuyez pour voir la réponse
+                  </ThemedText>
+                </Card.Content>
+              </LinearGradient>
+            </Animated.View>
 
-          <Animated.View
-            style={[styles.card, styles.cardBack, backAnimatedStyle]}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
-              Réponse
-            </ThemedText>
-            <ThemedText style={styles.cardContent}>
-              {currentCard.answer}
-            </ThemedText>
-            <ThemedText style={styles.tapHint}>
-              Appuyez pour voir la question
-            </ThemedText>
-          </Animated.View>
+            <Animated.View
+              style={[styles.card, styles.cardBack, backAnimatedStyle]}
+              entering={exitingCard ? undefined : SlideInLeft.duration(300)}
+              exiting={
+                exitingCard === "correct"
+                  ? SlideOutRight.duration(300)
+                  : SlideOutLeft.duration(300)
+              }
+            >
+              <LinearGradient
+                colors={
+                  isDark ? ["#293238", "#1d2529"] : ["#f5f5f5", "#ffffff"]
+                }
+                style={styles.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Card.Content style={styles.cardContent}>
+                  <ThemedText type="defaultSemiBold" style={styles.cardTitle}>
+                    Réponse
+                  </ThemedText>
+                  <ThemedText style={styles.cardContentText}>
+                    {currentCard.answer}
+                  </ThemedText>
+                  <ThemedText style={styles.tapHint}>
+                    Appuyez pour voir la question
+                  </ThemedText>
+                </Card.Content>
+              </LinearGradient>
+            </Animated.View>
+          </View>
         </TouchableOpacity>
       </View>
 
-      <ThemedView style={styles.responseButtons}>
-        <TouchableOpacity
-          style={[styles.responseButton, styles.incorrectButton]}
-          onPress={() => handleResponse(false)}
-        >
-          <IconSymbol name="xmark" size={24} color="white" />
-          <ThemedText style={styles.responseButtonText}>Incorrect</ThemedText>
-        </TouchableOpacity>
+      <Animated.View
+        style={styles.responseButtons}
+        entering={SlideInDown.duration(500)}
+      >
+        <Animated.View style={incorrectButtonStyle}>
+          <Button
+            variant="danger"
+            size="large"
+            leftIcon="xmark"
+            style={styles.incorrectButton}
+            onPress={() => handleResponse(false)}
+          >
+            Incorrect
+          </Button>
+        </Animated.View>
 
-        <TouchableOpacity
-          style={[styles.responseButton, styles.correctButton]}
-          onPress={() => handleResponse(true)}
-        >
-          <IconSymbol name="checkmark" size={24} color="white" />
-          <ThemedText style={styles.responseButtonText}>Correct</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
+        <Animated.View style={correctButtonStyle}>
+          <Button
+            variant="primary"
+            size="large"
+            leftIcon="checkmark"
+            style={styles.correctButton}
+            onPress={() => handleResponse(true)}
+          >
+            Correct
+          </Button>
+        </Animated.View>
+      </Animated.View>
 
-      <ThemedText style={styles.boxInfo}>
-        Boîte actuelle: {currentCard.boxLevel}
-      </ThemedText>
+      <Animated.View
+        style={styles.boxInfoContainer}
+        entering={FadeIn.delay(300).duration(500)}
+      >
+        <ThemedView style={styles.boxInfo}>
+          <ThemedText style={styles.boxInfoText}>
+            Boîte actuelle: {currentCard.boxLevel}
+          </ThemedText>
+          <View
+            style={[
+              styles.boxIndicator,
+              {
+                backgroundColor:
+                  colors.boxColors[
+                    currentCard.boxLevel as keyof typeof colors.boxColors
+                  ],
+              },
+            ]}
+          />
+        </ThemedView>
+      </Animated.View>
     </ThemedView>
   );
 }
@@ -220,17 +431,12 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginBottom: 20,
   },
-  progressBar: {
-    height: 10,
-    backgroundColor: "#e0e0e0",
-    borderRadius: 5,
-    marginTop: 5,
-    overflow: "hidden",
+  progressText: {
+    marginBottom: 8,
+    fontSize: 14,
   },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#0a7ea4",
-    borderRadius: 5,
+  progressBar: {
+    borderRadius: 6,
   },
   cardContainer: {
     flex: 1,
@@ -238,31 +444,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 20,
   },
-  card: {
+  cardTouchable: {
     width: width - 40,
-    height: height * 0.45,
-    backgroundColor: "#fff",
+    height: CARD_HEIGHT,
+  },
+  cardWrapper: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+  },
+  card: {
+    width: "100%",
+    height: "100%",
     borderRadius: 16,
-    padding: 20,
+    overflow: "hidden",
     elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    backfaceVisibility: "hidden",
-    justifyContent: "space-between",
+  },
+  cardGradient: {
+    width: "100%",
+    height: "100%",
   },
   cardBack: {
-    position: "absolute",
-    top: 0,
     backgroundColor: "#f8f8f8",
   },
+  cardContent: {
+    flex: 1,
+    padding: 24,
+    justifyContent: "space-between",
+  },
   cardTitle: {
-    marginBottom: 10,
+    marginBottom: 16,
     fontSize: 20,
     textAlign: "center",
   },
-  cardContent: {
+  cardContentText: {
     flex: 1,
     fontSize: 18,
     textAlign: "center",
@@ -273,35 +492,40 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     fontSize: 14,
     fontStyle: "italic",
+    marginTop: 16,
   },
   responseButtons: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
-  responseButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 15,
-    borderRadius: 10,
-    width: "45%",
-  },
   incorrectButton: {
-    backgroundColor: "#ff5252",
+    width: (width - 50) / 2,
   },
   correctButton: {
-    backgroundColor: "#4caf50",
+    width: (width - 50) / 2,
   },
-  responseButtonText: {
-    color: "white",
-    fontWeight: "600",
-    marginLeft: 8,
+  boxInfoContainer: {
+    alignItems: "center",
+    marginBottom: 10,
   },
   boxInfo: {
-    textAlign: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+  },
+  boxInfoText: {
     opacity: 0.7,
-    marginBottom: 10,
+    fontSize: 14,
+    marginRight: 8,
+  },
+  boxIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   completedContainer: {
     flex: 1,
@@ -309,38 +533,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  completedContent: {
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  completedIconContainer: {
+    marginBottom: 24,
+  },
+  completedIconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  completedIconInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   completedTitle: {
-    marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 12,
+    textAlign: "center",
   },
   completedText: {
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 32,
     fontSize: 16,
+    opacity: 0.8,
+    lineHeight: 24,
   },
   homeButton: {
-    backgroundColor: "#0a7ea4",
-    padding: 15,
-    borderRadius: 10,
-    width: "80%",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  homeButtonText: {
-    color: "white",
-    fontWeight: "600",
+    marginBottom: 16,
   },
   createButton: {
-    borderColor: "#0a7ea4",
-    borderWidth: 1,
-    padding: 15,
-    borderRadius: 10,
-    width: "80%",
-    alignItems: "center",
-  },
-  createButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
+    marginBottom: 0,
   },
   noCardsContainer: {
     flex: 1,
@@ -348,13 +579,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-  noCardsTitle: {
-    marginTop: 20,
-    marginBottom: 10,
+  noCardsContent: {
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
   },
-  noCardsText: {
-    textAlign: "center",
-    marginBottom: 30,
-    fontSize: 16,
+  noCardsIconContainer: {
+    marginBottom: 24,
   },
 });

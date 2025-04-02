@@ -1,38 +1,96 @@
 import { Tabs } from "expo-router";
-import React from "react";
-import { Platform } from "react-native";
+import { useEffect } from "react";
+import { Platform, StyleSheet } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import TabBarBackground from "@/components/ui/TabBarBackground";
-import { Colors } from "@/constants/Colors";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { colors, isDark } = useTheme();
+  const tabOpacity = useSharedValue(0);
+
+  // Animation d'entrée pour la barre d'onglets
+  useEffect(() => {
+    tabOpacity.value = withTiming(1, { duration: 500 });
+  }, []);
+
+  // Style animé pour la barre d'onglets
+  const tabBarStyle = useAnimatedStyle(() => ({
+    opacity: tabOpacity.value,
+    transform: [
+      { translateY: withTiming(tabOpacity.value * 0, { duration: 300 }) },
+    ],
+  }));
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabIconDefault,
         headerShown: true,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
+        headerStyle: {
+          backgroundColor: isDark
+            ? colors.backgroundSecondary
+            : colors.background,
+        },
+        headerTitleStyle: {
+          fontFamily: "PoppinsSemiBold",
+          fontSize: 17,
+        },
+        headerTintColor: colors.text,
+        tabBarLabelStyle: {
+          fontFamily: "Poppins",
+          fontSize: 11,
+          marginBottom: 4,
+        },
+        tabBarStyle: [
+          {
             position: "absolute",
+            borderTopColor: colors.border,
+            height: 60,
+            backgroundColor: isDark
+              ? "rgba(30, 32, 33, 0.9)"
+              : "rgba(255, 255, 255, 0.9)",
+            borderTopWidth: StyleSheet.hairlineWidth,
+            paddingBottom: Platform.OS === "ios" ? 20 : 10,
+            ...Platform.select({
+              ios: {
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 6,
+              },
+              android: {
+                elevation: 8,
+              },
+            }),
           },
-          default: {},
-        }),
+          tabBarStyle,
+        ],
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Accueil",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                focused && styles.activeIconContainer,
+              ]}
+            >
+              <IconSymbol size={24} name="house.fill" color={color} />
+            </Animated.View>
           ),
         }}
       />
@@ -40,8 +98,15 @@ export default function TabLayout() {
         name="flashcards"
         options={{
           title: "Flashcards",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.stack.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                focused && styles.activeIconContainer,
+              ]}
+            >
+              <IconSymbol size={24} name="square.stack.fill" color={color} />
+            </Animated.View>
           ),
         }}
       />
@@ -49,8 +114,15 @@ export default function TabLayout() {
         name="contents"
         options={{
           title: "Contenu",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="doc.text.fill" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                focused && styles.activeIconContainer,
+              ]}
+            >
+              <IconSymbol size={24} name="doc.text.fill" color={color} />
+            </Animated.View>
           ),
         }}
       />
@@ -58,15 +130,32 @@ export default function TabLayout() {
         name="quiz"
         options={{
           title: "Quiz",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={28}
-              name="questionmark.square.fill"
-              color={color}
-            />
+          tabBarIcon: ({ color, focused }) => (
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                focused && styles.activeIconContainer,
+              ]}
+            >
+              <IconSymbol
+                size={24}
+                name="questionmark.square.fill"
+                color={color}
+              />
+            </Animated.View>
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    padding: 8,
+    borderRadius: 16,
+  },
+  activeIconContainer: {
+    backgroundColor: "rgba(0, 153, 255, 0.1)",
+  },
+});
