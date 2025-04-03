@@ -504,8 +504,14 @@ const styles = StyleSheet.create({
   processingText: {
     textAlign: "center",
     marginBottom: 20,
-    opacity: 0.8,
-  },
+    opacity: 1,
+    fontWeight: "500",
+    color: "#1B1E1C", // Pour thème clair — ou choisis une couleur neutre jade
+    textShadowColor: "rgba(0, 0, 0, 0.1)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },  
+  
   processingProgress: {
     width: "100%",
     borderRadius: 4,
@@ -596,6 +602,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   disabledText: {
-    opacity: 0.5,
+    opacity: 1,
   },
 });
