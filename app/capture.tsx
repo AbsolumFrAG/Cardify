@@ -145,10 +145,7 @@ export default function CaptureScreen() {
           setProcessing(true);
           setProcessingStep("Capture de l'image...");
 
-          const photo = await cameraRef.current.takePictureAsync({
-            quality: 0.8,
-            skipProcessing: false,
-          });
+          const photo = await cameraRef.current.takePictureAsync();
 
           if (photo && photo.uri) {
             await processImage(photo.uri);
