@@ -9,6 +9,7 @@ import { useFlashcards } from "@/context/FlashcardContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BlurView } from "expo-blur";
 import { Camera, CameraType, CameraView } from "expo-camera";
+import { LinearGradient } from "expo-linear-gradient";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -29,12 +30,14 @@ import Animated, {
   SlideInUp,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { v4 as uuidv4 } from "uuid";
 
 const FLASH_DURATION = 200;
+const CAPTURE_BUTTON_SIZE = 80;
 
 export default function CaptureScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -56,6 +59,11 @@ export default function CaptureScreen() {
     opacity: flashOpacity.value,
   }));
 
+  const pulseAnimation = useSharedValue(1);
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnimation.value }],
+  }));
+
   const captureButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: captureButtonScale.value }],
   }));
@@ -65,6 +73,16 @@ export default function CaptureScreen() {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === "granted");
     })();
+    
+    // Animation de pulsation continue
+    pulseAnimation.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 1000 }),
+        withTiming(0.95, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
   }, []);
 
   // Simuler la progression pendant le traitement
@@ -103,6 +121,13 @@ export default function CaptureScreen() {
     captureButtonScale.value = withSequence(
       withTiming(0.9, { duration: 100 }),
       withTiming(1.1, { duration: 100 }),
+      withTiming(1, { duration: 200 })
+    );
+
+    // Effet de pulsation accentuée
+    pulseAnimation.value = withSequence(
+      withTiming(1.2, { duration: 100 }),
+      withTiming(0.8, { duration: 200 }),
       withTiming(1, { duration: 200 })
     );
 
@@ -311,7 +336,14 @@ export default function CaptureScreen() {
           <Animated.View
             style={[styles.flash, flashAnimatedStyle]}
             pointerEvents="none"
-          />
+          >
+            <LinearGradient
+              colors={["rgba(255,255,255,0.8)", "rgba(255,255,255,0)"]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+            />
+          </Animated.View>
         </View>
       </CameraView>
 

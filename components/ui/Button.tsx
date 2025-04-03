@@ -1,6 +1,7 @@
 import { ThemedText } from "@/components/ThemedText";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { useTheme } from "@/context/ThemeContext";
+import { useButtonAnimation } from "@/hooks/useAnimations";
 import { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -12,11 +13,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 
 const AnimatedTouchableOpacity =
   Animated.createAnimatedComponent(TouchableOpacity);
@@ -58,24 +55,22 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const { colors, isDark } = useTheme();
-  const scale = useSharedValue(1);
+  const {
+    animatedStyle,
+    onPressIn: animatedPressIn,
+    onPressOut: animatedPressOut,
+  } = useButtonAnimation();
 
   // Gestion des animations de pression
   const handlePressIn = (e: any) => {
-    scale.value = withTiming(0.96, { duration: 100 });
+    animatedPressIn();
     onPressIn?.(e);
   };
 
   const handlePressOut = (e: any) => {
-    scale.value = withTiming(1, { duration: 200 });
+    animatedPressOut();
     onPressOut?.(e);
   };
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
 
   // Déterminer les styles selon la variante
   const getVariantStyles = () => {

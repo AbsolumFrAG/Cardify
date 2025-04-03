@@ -17,7 +17,7 @@ import Animated, {
 import { ThemedText } from "./ThemedText";
 import { IconSymbol } from "./ui/IconSymbol";
 
-const AnimatedTouchableOpacity =
+const AnimatedTouchableOpacity = 
   Animated.createAnimatedComponent(TouchableOpacity);
 
 interface FlashcardItemProps {
@@ -47,43 +47,49 @@ export function FlashcardItem({
   const flipCard = () => {
     const newValue = isFlipped ? 0 : 1;
     rotate.value = withTiming(newValue, {
-      duration: 400,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      duration: 500,
+      easing: Easing.bezier(0.32, 0, 0.67, 1),
     });
     setIsFlipped(!isFlipped);
   };
 
-  const frontAnimatedStyle = useAnimatedStyle(() => {
+  const frontAnimatedStyle = useAnimatedStyle<any>(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [0, 180]);
+    const zIndex = rotate.value > 0.5 ? -1 : 1;
 
     return {
       transform: [
         { perspective: 1000 },
         { rotateY: `${rotateValue}deg` },
         { scale: scale.value },
+        { translateZ: rotate.value > 0.5 ? -10 : 0 },
       ],
       opacity: rotate.value > 0.5 ? 0 : 1,
       position: "absolute",
       width: "100%",
       height: "100%",
       backfaceVisibility: "hidden",
+      zIndex,
     };
   });
 
-  const backAnimatedStyle = useAnimatedStyle(() => {
+  const backAnimatedStyle = useAnimatedStyle<any>(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [180, 360]);
+    const zIndex = rotate.value < 0.5 ? -1 : 1;
 
     return {
       transform: [
         { perspective: 1000 },
         { rotateY: `${rotateValue}deg` },
         { scale: scale.value },
+        { translateZ: rotate.value < 0.5 ? -10 : 0 },
       ],
       opacity: rotate.value < 0.5 ? 0 : 1,
       position: "absolute",
       width: "100%",
       height: "100%",
       backfaceVisibility: "hidden",
+      zIndex,
     };
   });
 

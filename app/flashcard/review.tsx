@@ -51,6 +51,8 @@ export default function ReviewScreen() {
   // Animer un bouton de réponse lorsqu'il est pressé
   const buttonScaleCorrect = useSharedValue(1);
   const buttonScaleIncorrect = useSharedValue(1);
+  const buttonBounceCorrect = useSharedValue(0);
+  const buttonBounceIncorrect = useSharedValue(0);
 
   useEffect(() => {
     const cards = getDueFlashcards(flashcards);
@@ -64,6 +66,10 @@ export default function ReviewScreen() {
   // Style animé pour la rotation de la carte
   const frontAnimatedStyle = useAnimatedStyle(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [0, 180]);
+    const shadowOpacity = interpolate(rotate.value, [0, 0.5], [0.1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp'
+    });
 
     return {
       transform: [
@@ -78,12 +84,21 @@ export default function ReviewScreen() {
       width: "100%",
       height: "100%",
       backfaceVisibility: "hidden",
+      shadowColor: isDark ? '#000' : '#888',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity,
+      shadowRadius: 4,
+      elevation: 5,
     };
   });
 
   // Style animé pour le dos de la carte
   const backAnimatedStyle = useAnimatedStyle(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [180, 360]);
+    const shadowOpacity = interpolate(rotate.value, [0.5, 1], [0, 0.1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp'
+    });
 
     return {
       transform: [
@@ -98,20 +113,31 @@ export default function ReviewScreen() {
       width: "100%",
       height: "100%",
       backfaceVisibility: "hidden",
+      shadowColor: isDark ? '#000' : '#888',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity,
+      shadowRadius: 4,
+      elevation: 5,
     };
   });
 
   // Style animé pour le bouton correct
   const correctButtonStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: buttonScaleCorrect.value }],
+      transform: [
+        { scale: buttonScaleCorrect.value },
+        { translateY: buttonBounceCorrect.value * -5 }
+      ],
     };
   });
 
   // Style animé pour le bouton incorrect
   const incorrectButtonStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: buttonScaleIncorrect.value }],
+      transform: [
+        { scale: buttonScaleIncorrect.value },
+        { translateY: buttonBounceIncorrect.value * -5 }
+      ],
     };
   });
 
@@ -140,10 +166,18 @@ export default function ReviewScreen() {
         withTiming(0.9, { duration: 100 }),
         withTiming(1, { duration: 200 })
       );
+      buttonBounceCorrect.value = withSequence(
+        withTiming(1, { duration: 100 }),
+        withTiming(0, { duration: 200, easing: Easing.out(Easing.elastic(1)) })
+      );
     } else {
       buttonScaleIncorrect.value = withSequence(
         withTiming(0.9, { duration: 100 }),
         withTiming(1, { duration: 200 })
+      );
+      buttonBounceIncorrect.value = withSequence(
+        withTiming(1, { duration: 100 }),
+        withTiming(0, { duration: 200, easing: Easing.out(Easing.elastic(1)) })
       );
     }
 
@@ -294,6 +328,7 @@ export default function ReviewScreen() {
           width="100%"
           useGradient
           style={styles.progressBar}
+          animated
         />
       </Animated.View>
 
@@ -412,7 +447,7 @@ export default function ReviewScreen() {
               {
                 backgroundColor:
                   colors.boxColors[
-                    currentCard.boxLevel as keyof typeof colors.boxColors
+                  currentCard.boxLevel as keyof typeof colors.boxColors
                   ],
               },
             ]}

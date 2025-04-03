@@ -1,6 +1,7 @@
 import { useRef } from "react";
-import { Animated, Easing } from "react-native";
+import { Animated } from "react-native";
 import {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -123,8 +124,14 @@ export function useReanimatedAnimation(initialValue = 0) {
   // Animation de pulsation (pulse)
   const pulse = (intensity = 1.1, duration = 500) => {
     progress.value = withSequence(
-      withTiming(intensity, { duration: duration / 2 }),
-      withTiming(1, { duration: duration / 2 })
+      withTiming(intensity, {
+        duration: duration / 2,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+      }),
+      withTiming(1, {
+        duration: duration / 2,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+      })
     );
   };
 
@@ -152,11 +159,17 @@ export function useButtonAnimation() {
 
   // Fonctions pour animer le bouton lors des interactions
   const onPressIn = () => {
-    scale.value = withTiming(0.95, { duration: 100 });
+    scale.value = withTiming(0.95, {
+      duration: 100,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
   };
 
   const onPressOut = () => {
-    scale.value = withTiming(1, { duration: 200 });
+    scale.value = withTiming(1, {
+      duration: 200,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
   };
 
   return {
@@ -183,14 +196,26 @@ export function useScreenTransition(isVisible = false) {
 
   // Afficher l'écran avec une transition
   const show = (duration = 300) => {
-    opacity.value = withTiming(1, { duration });
-    translateY.value = withTiming(0, { duration });
+    opacity.value = withTiming(1, {
+      duration,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
+    translateY.value = withTiming(0, {
+      duration,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
   };
 
   // Masquer l'écran avec une transition
   const hide = (duration = 300) => {
-    opacity.value = withTiming(0, { duration });
-    translateY.value = withTiming(20, { duration });
+    opacity.value = withTiming(0, {
+      duration,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
+    translateY.value = withTiming(20, {
+      duration,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1)
+    });
   };
 
   return {

@@ -1,4 +1,5 @@
-import { Animated, Easing } from "react-native";
+import { Animated } from "react-native";
+import { Easing } from "react-native-reanimated";
 
 /**
  * Animation de séquence avec Promises pour un chaînage facile
