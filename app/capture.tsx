@@ -1,4 +1,4 @@
-import { extractTextFromImage, generateFlashcards } from "@/api/openai";
+import { extractTextFromImage, generateFlashcards } from "@/api/cardifyApi";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/ui/Button";
@@ -9,15 +9,16 @@ import { useFlashcards } from "@/context/FlashcardContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BlurView } from "expo-blur";
 import { Camera, CameraType, CameraView } from "expo-camera";
-import { LinearGradient } from "expo-linear-gradient";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Platform,
   StyleSheet,
   TouchableOpacity,
@@ -25,9 +26,11 @@ import {
 } from "react-native";
 import "react-native-get-random-values";
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   SlideInUp,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -37,7 +40,7 @@ import Animated, {
 import { v4 as uuidv4 } from "uuid";
 
 const FLASH_DURATION = 200;
-const CAPTURE_BUTTON_SIZE = 80;
+const CAPTURE_BUTTON_SIZE = 70;
 
 export default function CaptureScreen() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -50,11 +53,13 @@ export default function CaptureScreen() {
   const { addContent } = useContent();
   const { colors, isDark } = useTheme();
 
-  // Animations
+  // Enhanced animations
   const flashOpacity = useSharedValue(0);
   const captureButtonScale = useSharedValue(1);
+  const guidlineOpacity = useSharedValue(1);
+  const guidelineAnimationProgress = useSharedValue(0);
 
-  // Styles animés
+  // Animated styles
   const flashAnimatedStyle = useAnimatedStyle(() => ({
     opacity: flashOpacity.value,
   }));
@@ -65,44 +70,82 @@ export default function CaptureScreen() {
   }));
 
   const captureButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: captureButtonScale.value }],
+    transform: [
+      { scale: captureButtonScale.value },
+      { translateY: withTiming(processing ? 100 : 0, { duration: 400 }) },
+    ],
+    opacity: withTiming(processing ? 0 : 1, { duration: 300 }),
   }));
+
+  // Animated guidelines
+  const guidelinesStyle = useAnimatedStyle(() => {
+    const borderColor = interpolateColor(
+      guidelineAnimationProgress.value,
+      [0, 0.5, 1],
+      [
+        "rgba(255, 255, 255, 0.4)",
+        "rgba(255, 255, 255, 0.8)",
+        "rgba(255, 255, 255, 0.4)",
+      ]
+    );
+
+    return {
+      borderColor,
+      opacity: guidlineOpacity.value,
+    };
+  });
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === "granted");
     })();
-    
-    // Animation de pulsation continue
+
+    // Enhanced pulsation animation for guidelines
+    guidelineAnimationProgress.value = withRepeat(
+      withTiming(1, { duration: 2000 }),
+      -1,
+      true
+    );
+
+    // Pulse animation for capture button
     pulseAnimation.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 1000 }),
-        withTiming(0.95, { duration: 1000 })
+        withTiming(1.05, {
+          duration: 1500,
+          easing: Easing.inOut(Easing.cubic),
+        }),
+        withTiming(0.95, { duration: 1500, easing: Easing.inOut(Easing.cubic) })
       ),
       -1,
       true
     );
   }, []);
 
-  // Simuler la progression pendant le traitement
+  // Enhanced progress simulation during processing
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
     if (processing) {
-      // Réinitialiser la progression au début du traitement
+      // Reset progress at the start of processing
       setProcessingProgress(0);
+
+      // Hide guidelines during processing
+      guidlineOpacity.value = withTiming(0, { duration: 300 });
 
       interval = setInterval(() => {
         setProcessingProgress((prev) => {
-          // Limiter la progression à 90% pour attendre la fin réelle du traitement
-          const next = prev + (0.5 + Math.random() * 1.5);
-          return next > 90 ? 90 : next;
+          // Limit progress to 92% to wait for actual processing completion
+          const next = prev + (0.5 + Math.random() * 1.2);
+          return next > 92 ? 92 : next;
         });
       }, 300);
     } else {
-      // Compléter la progression à 100% à la fin du traitement
+      // Complete progress to 100% at the end of processing
       setProcessingProgress(100);
+
+      // Show guidelines when not processing
+      guidlineOpacity.value = withTiming(1, { duration: 300 });
     }
 
     return () => {
@@ -110,28 +153,29 @@ export default function CaptureScreen() {
     };
   }, [processing]);
 
+  // Enhanced flash animation with haptic feedback
   const animateFlash = () => {
-    // Effet de flash visuel lors de la prise de photo
+    // Visual flash effect when taking a photo
     flashOpacity.value = withSequence(
       withTiming(1, { duration: FLASH_DURATION / 2 }),
       withTiming(0, { duration: FLASH_DURATION / 2 })
     );
 
-    // Animation du bouton de capture
+    // Enhanced button animation
     captureButtonScale.value = withSequence(
       withTiming(0.9, { duration: 100 }),
-      withTiming(1.1, { duration: 100 }),
-      withTiming(1, { duration: 200 })
+      withTiming(1.15, { duration: 150 }),
+      withTiming(1, { duration: 250, easing: Easing.elastic(1.2) })
     );
 
-    // Effet de pulsation accentuée
+    // Enhanced pulse animation
     pulseAnimation.value = withSequence(
       withTiming(1.2, { duration: 100 }),
       withTiming(0.8, { duration: 200 }),
-      withTiming(1, { duration: 200 })
+      withTiming(1, { duration: 300, easing: Easing.elastic(1.2) })
     );
 
-    // Retour haptique
+    // Enhanced haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
@@ -141,11 +185,14 @@ export default function CaptureScreen() {
         animateFlash();
 
         if (cameraRef.current instanceof CameraView) {
-          // Marquer comme en cours de traitement
+          // Mark as processing
           setProcessing(true);
-          setProcessingStep("Capture de l'image...");
+          setProcessingStep("Capture de l'image en cours...");
 
-          const photo = await cameraRef.current.takePictureAsync();
+          const photo = await cameraRef.current.takePictureAsync({
+            quality: 0.8,
+            skipProcessing: false,
+          });
 
           if (photo && photo.uri) {
             await processImage(photo.uri);
@@ -188,19 +235,19 @@ export default function CaptureScreen() {
 
   const processImage = async (imageUri: string) => {
     try {
-      // Mise à jour du statut de traitement
+      // Update processing status
       setProcessingStep("Conversion de l'image...");
 
-      // Convertir l'image en base64
+      // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Extraire le texte avec l'API OpenAI
+      // Extract text with Gemini API
       setProcessingStep("Extraction du texte avec l'IA...");
       const response = await extractTextFromImage(base64);
 
-      // Vérifier si l'extraction a réussi
+      // Check if extraction succeeded
       if (!response.success || !response.text) {
         Alert.alert(
           "Extraction impossible",
@@ -211,11 +258,11 @@ export default function CaptureScreen() {
         return;
       }
 
-      // Générer des flashcards automatiquement
+      // Generate flashcards automatically
       setProcessingStep("Génération des flashcards...");
       const generatedCards = await generateFlashcards(response.text, 5);
 
-      // Créer un nouveau contenu de cours
+      // Create new course content
       setProcessingStep("Enregistrement du contenu...");
       const contentId = uuidv4();
       const content = {
@@ -235,21 +282,21 @@ export default function CaptureScreen() {
         imageUri: imageUri,
       };
 
-      // Ajouter le contenu
+      // Add content
       await addContent(content);
 
-      // Ajouter les flashcards générées
+      // Add generated flashcards
       for (const card of generatedCards) {
         await addFlashcard(card.question, card.answer, contentId);
       }
 
-      // Compléter la progression
+      // Complete progress
       setProcessingProgress(100);
       setProcessingStep("Terminé !");
 
-      // Ajouter un petit délai pour montrer la progression complète
+      // Add a small delay to show completed progress
       setTimeout(() => {
-        // Rediriger vers la page de contenu
+        // Redirect to content page
         router.replace(`/content/${contentId}`);
       }, 500);
     } catch (error) {
@@ -263,34 +310,48 @@ export default function CaptureScreen() {
   };
 
   if (hasPermission === null) {
-    // Camera permissions are still loading
+    // Camera permissions still loading
     return (
       <ThemedView style={styles.loadingContainer}>
+        <LinearGradient
+          colors={isDark ? ["#121212", "#1e1e1e"] : ["#f5f5f5", "#ffffff"]}
+          style={StyleSheet.absoluteFill}
+        />
         <ActivityIndicator size="large" color={colors.primary} />
         <ThemedText style={styles.loadingText}>
-          Chargement de la caméra...
+          Initialisation de la caméra...
         </ThemedText>
       </ThemedView>
     );
   }
 
   if (hasPermission === false) {
-    // Camera permissions are not granted yet
+    // Modern no permission UI
     return (
       <ThemedView style={styles.container}>
+        <LinearGradient
+          colors={isDark ? ["#121212", "#1e1e1e"] : ["#f5f5f5", "#ffffff"]}
+          style={StyleSheet.absoluteFill}
+        />
         <Animated.View
           style={styles.permissionContainer}
           entering={FadeIn.duration(500)}
         >
-          <IconSymbol
-            name="camera.metering.none"
-            size={60}
-            color={colors.primary}
-          />
+          <View style={styles.permissionIconContainer}>
+            <IconSymbol
+              name="camera.metering.none"
+              size={60}
+              color={colors.primary}
+            />
+          </View>
 
-          <ThemedText style={styles.errorText}>
-            Accès à la caméra refusé. Veuillez activer les permissions de caméra
-            pour capturer vos notes.
+          <ThemedText type="subtitle" style={styles.permissionTitle}>
+            Accès à la caméra requis
+          </ThemedText>
+
+          <ThemedText style={styles.permissionText}>
+            Pour capturer vos notes et créer des flashcards automatiquement,
+            Cardify a besoin d'accéder à votre caméra.
           </ThemedText>
 
           <Button
@@ -320,22 +381,28 @@ export default function CaptureScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Camera view */}
       <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
         <View style={styles.overlay}>
-          <View style={styles.cameraGuidelines}>
+          {/* Enhanced camera guidelines */}
+          <Animated.View style={[styles.cameraGuidelines, guidelinesStyle]}>
             <View style={styles.cameraGuidelinesCorner} />
             <View style={styles.cameraGuidelinesCorner} />
             <View style={styles.cameraGuidelinesCorner} />
             <View style={styles.cameraGuidelinesCorner} />
-          </View>
 
-          {/* Flash d'animation lors de la prise de photo */}
+            {/* Center alignment markers */}
+            <View style={styles.centerAlignMarker} />
+            <View style={[styles.centerAlignMarker, styles.horizontalMarker]} />
+          </Animated.View>
+
+          {/* Flash animation during photo capture */}
           <Animated.View
             style={[styles.flash, flashAnimatedStyle]}
             pointerEvents="none"
           >
             <LinearGradient
-              colors={["rgba(255,255,255,0.8)", "rgba(255,255,255,0)"]}
+              colors={["rgba(255,255,255,0.9)", "rgba(255,255,255,0)"]}
               style={StyleSheet.absoluteFill}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
@@ -344,7 +411,7 @@ export default function CaptureScreen() {
         </View>
       </CameraView>
 
-      {/* Overlay de traitement */}
+      {/* Enhanced processing overlay */}
       {processing && (
         <Animated.View
           style={styles.processingOverlay}
@@ -352,7 +419,7 @@ export default function CaptureScreen() {
           exiting={FadeOut.duration(300)}
         >
           <BlurView
-            intensity={isDark ? 40 : 80}
+            intensity={isDark ? 40 : 90}
             tint={isDark ? "dark" : "light"}
             style={StyleSheet.absoluteFill}
           />
@@ -361,7 +428,18 @@ export default function CaptureScreen() {
             entering={SlideInUp.duration(400).springify()}
           >
             <View style={styles.processingIconContainer}>
-              <IconSymbol name="brain" size={40} color={colors.primary} />
+              <LinearGradient
+                colors={
+                  isDark
+                    ? [colors.primary, colors.secondary]
+                    : [colors.primary, colors.primaryLight]
+                }
+                style={styles.processingIconGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <IconSymbol name="brain" size={40} color="#fff" />
+              </LinearGradient>
             </View>
 
             <ThemedText style={styles.processingTitle}>
@@ -377,49 +455,72 @@ export default function CaptureScreen() {
               height={8}
               style={styles.processingProgress}
               useGradient
+              gradientColors={[colors.primary, colors.secondary]}
             />
           </Animated.View>
         </Animated.View>
       )}
 
-      <View style={styles.controls}>
-        <Button
-          variant="outline"
-          leftIcon="photo"
-          size="medium"
-          style={styles.controlButton}
-          textStyle={styles.controlButtonText}
-          onPress={pickImage}
-          disabled={processing}
-        >
-          Galerie
-        </Button>
+      {/* Enhanced camera controls */}
+      <View style={styles.controlsContainer}>
+        <LinearGradient
+          colors={["rgba(0,0,0,0.7)", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.7)"]}
+          style={styles.controlsGradient}
+        />
 
-        <Animated.View
-          style={[styles.captureButtonContainer, captureButtonAnimatedStyle]}
-        >
-          <TouchableOpacity
-            style={[styles.captureButton, processing && styles.disabledButton]}
-            onPress={takePicture}
+        <View style={styles.controls}>
+          <Button
+            variant="ghost"
+            leftIcon="photo"
+            size="medium"
+            style={styles.controlButton}
+            textStyle={styles.controlButtonText}
+            onPress={pickImage}
             disabled={processing}
-            activeOpacity={0.8}
           >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
-        </Animated.View>
+            Galerie
+          </Button>
 
-        <Button
-          variant="ghost"
-          style={styles.cancelButton}
-          textStyle={styles.cancelButtonText}
-          onPress={() => router.back()}
-          disabled={processing}
-        >
-          Annuler
-        </Button>
+          <Animated.View
+            style={[
+              styles.captureButtonContainer,
+              captureButtonAnimatedStyle,
+              pulseStyle,
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.captureButton,
+                processing && styles.disabledButton,
+              ]}
+              onPress={takePicture}
+              disabled={processing}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#ffffff", "#f0f0f0"]}
+                style={styles.captureButtonInner}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+
+          <Button
+            variant="ghost"
+            style={styles.cancelButton}
+            textStyle={styles.cancelButtonText}
+            onPress={() => router.back()}
+            disabled={processing}
+          >
+            Annuler
+          </Button>
+        </View>
       </View>
 
+      {/* Instruction footer */}
       <View style={styles.instructionContainer}>
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
         <ThemedText style={styles.instructionText}>
           {processing
             ? "Traitement en cours, veuillez patienter..."
@@ -444,11 +545,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cameraGuidelines: {
-    width: "90%",
-    height: "70%",
-    borderWidth: 1,
+    width: "85%",
+    height: "65%",
+    borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.5)",
-    borderRadius: 12,
+    borderRadius: 16,
     position: "relative",
   },
   cameraGuidelinesCorner: {
@@ -456,6 +557,27 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderColor: "rgba(255, 255, 255, 0.8)",
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    top: -2,
+    left: -2,
+    borderTopLeftRadius: 16,
+  },
+  centerAlignMarker: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: 40,
+    height: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    marginLeft: -20,
+    marginTop: -1,
+  },
+  horizontalMarker: {
+    width: 2,
+    height: 40,
+    marginLeft: -1,
+    marginTop: -20,
   },
   flash: {
     ...StyleSheet.absoluteFillObject,
@@ -470,58 +592,64 @@ const styles = StyleSheet.create({
   },
   processingCard: {
     backgroundColor:
-      Platform.OS === "ios" ? "rgba(255, 255, 255, 0.7)" : "#FFFFFF", // Nous utiliserons dynamiquement la couleur appropriée dans le composant
-    borderRadius: 20,
-    padding: 24,
+      Platform.OS === "ios" ? "rgba(255, 255, 255, 0.7)" : "#FFFFFF",
+    borderRadius: 24,
+    padding: 30,
     width: "85%",
     alignItems: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 8,
+        elevation: 10,
       },
     }),
   },
   processingIconContainer: {
+    marginBottom: 24,
+  },
+  processingIconGradient: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(0, 153, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
   },
   processingTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 12,
   },
   processingText: {
     textAlign: "center",
-    marginBottom: 20,
-    opacity: 1,
+    marginBottom: 24,
+    opacity: 0.8,
     fontWeight: "500",
-    color: "#1B1E1C", // Pour thème clair — ou choisis une couleur neutre jade
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },  
-  
+    fontSize: 16,
+  },
   processingProgress: {
     width: "100%",
-    borderRadius: 4,
+    borderRadius: 6,
+  },
+  controlsContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 110,
+  },
+  controlsGradient: {
+    ...StyleSheet.absoluteFillObject,
   },
   controls: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#000",
   },
   captureButtonContainer: {
     shadowColor: "#fff",
@@ -530,45 +658,45 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: CAPTURE_BUTTON_SIZE,
+    height: CAPTURE_BUTTON_SIZE,
+    borderRadius: CAPTURE_BUTTON_SIZE / 2,
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 3,
+    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "white",
+    width: CAPTURE_BUTTON_SIZE - 12,
+    height: CAPTURE_BUTTON_SIZE - 12,
+    borderRadius: (CAPTURE_BUTTON_SIZE - 12) / 2,
   },
   controlButton: {
     paddingHorizontal: 16,
   },
   controlButtonText: {
     color: "white",
-    fontSize: 14,
+    fontSize: 15,
   },
   cancelButton: {
     paddingHorizontal: 16,
   },
   cancelButtonText: {
     color: "white",
-    fontSize: 14,
-  },
-  pickButtonText: {
-    color: "#0a7ea4",
-    fontWeight: "600",
-    marginVertical: 10,
+    fontSize: 15,
   },
   instructionContainer: {
-    padding: 15,
-    backgroundColor: "#000",
+    padding: 16,
+    position: "absolute",
+    bottom: 110,
+    left: 0,
+    right: 0,
   },
   instructionText: {
     color: "white",
     textAlign: "center",
+    fontSize: 15,
   },
   loadingContainer: {
     flex: 1,
@@ -577,31 +705,48 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     textAlign: "center",
+    fontSize: 16,
   },
   permissionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    padding: 24,
   },
-  errorText: {
+  permissionIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(0, 153, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  permissionTitle: {
+    fontSize: 24,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  permissionText: {
     margin: 20,
     textAlign: "center",
     marginBottom: 30,
+    fontSize: 16,
+    lineHeight: 24,
+    opacity: 0.8,
   },
   permissionButton: {
     marginBottom: 16,
     width: "100%",
+    maxWidth: 350,
   },
   pickButton: {
     width: "100%",
+    maxWidth: 350,
   },
   disabledButton: {
     opacity: 0.5,
-  },
-  disabledText: {
-    opacity: 1,
   },
 });

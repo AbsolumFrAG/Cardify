@@ -11,10 +11,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+// Types de valeurs acceptées pour width
+type WidthProp = number | `${number}%` | "auto";
+
 interface ProgressBarProps {
   progress: number; // 0 to 1
   height?: number;
-  width?: number | string;
+  width?: WidthProp;
   color?: string;
   backgroundColor?: string;
   animated?: boolean;
@@ -22,7 +25,7 @@ interface ProgressBarProps {
   style?: StyleProp<ViewStyle>;
   borderRadius?: number;
   useGradient?: boolean;
-  gradientColors?: string[];
+  gradientColors?: readonly [string, string, ...string[]];
   gradientStart?: { x: number; y: number };
   gradientEnd?: { x: number; y: number };
 }
@@ -51,10 +54,9 @@ export function ProgressBar({
 
   // Définir les couleurs par défaut
   const progressColor = color || colors.primary;
-  const gradientColorsDefault = gradientColors || [
-    colors.primary,
-    colors.secondary,
-  ];
+  // Assurer que gradientColorsDefault a le bon type avec au moins 2 couleurs
+  const gradientColorsDefault: readonly [string, string, ...string[]] =
+    gradientColors || [colors.primary, colors.secondary];
   const bgColor = backgroundColor || colors.backgroundTertiary;
   const radiusValue = borderRadius !== undefined ? borderRadius : height / 2;
 
@@ -105,7 +107,7 @@ export function ProgressBar({
         styles.container,
         {
           height,
-          width,
+          width: width as any,
           backgroundColor: bgColor,
           borderRadius: radiusValue,
         },

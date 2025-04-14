@@ -1,18 +1,18 @@
+import { useThemeColor } from "@/hooks/useThemeColor";
 import { LEITNER_BOX_INTERVALS } from "@/services/leitnerSystem";
 import { Flashcard } from "@/types/flashcard";
 import { useMemo } from "react";
-import { StyleSheet } from "react-native";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { StyleSheet, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 import { IconSymbol } from "./ui/IconSymbol";
 
 interface FlashcardStatsProps {
-  flashcards?: Flashcard[]; // sécurité
+  flashcards?: Flashcard[]; // safeguard
 }
 
 export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
-  const bg = useThemeColor({}, "background");
   const surface = useThemeColor({}, "backgroundSecondary");
   const border = useThemeColor({}, "border");
   const primary = useThemeColor({}, "primary");
@@ -64,6 +64,7 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
   if (!flashcards || stats.totalCards === 0) {
     return (
       <ThemedView style={[styles.emptyContainer, { backgroundColor: surface }]}>
+        <IconSymbol name="square.stack" size={36} color={textSecondary} />
         <ThemedText style={[styles.emptyText, { color: textSecondary }]}>
           Aucune flashcard pour le moment. Commencez par capturer des notes ou
           créer manuellement une flashcard.
@@ -74,8 +75,11 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Statistiques générales */}
-      <ThemedView style={styles.generalStats}>
+      {/* General stats */}
+      <Animated.View
+        style={styles.generalStats}
+        entering={FadeIn.duration(400)}
+      >
         <ThemedView style={styles.statItem}>
           <ThemedText style={[styles.statValue, { color: primary }]}>
             {stats.totalCards}
@@ -84,6 +88,8 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
             Total
           </ThemedText>
         </ThemedView>
+
+        <View style={styles.statDivider} />
 
         <ThemedView style={styles.statItem}>
           <ThemedText style={[styles.statValue, { color: primary }]}>
@@ -94,6 +100,8 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
           </ThemedText>
         </ThemedView>
 
+        <View style={styles.statDivider} />
+
         <ThemedView style={styles.statItem}>
           <ThemedText style={[styles.statValue, { color: primary }]}>
             {stats.masteryPercentage}%
@@ -102,9 +110,9 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
             Maîtrisées
           </ThemedText>
         </ThemedView>
-      </ThemedView>
+      </Animated.View>
 
-      {/* Visualisation des boîtes Leitner */}
+      {/* Box distribution visualization */}
       <ThemedText style={[styles.sectionTitle, { color: text }]}>
         Répartition par boîte
       </ThemedText>
@@ -114,20 +122,33 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
           const boxNumber = index + 1;
           const percentage = Math.round((count / stats.totalCards) * 100) || 0;
 
+          // Enhanced colors with better contrast
           const colors = [
-            "#F28B82",
-            "#F2C77C",
-            "#FFD97D",
-            "#A1D9B2",
-            primary,
+            "#F44336", // Red for Box 1
+            "#FF9800", // Orange for Box 2
+            "#FFC107", // Amber for Box 3
+            "#8BC34A", // Light Green for Box 4
+            primary, // Primary color for Box 5
           ];
 
           return (
-            <ThemedView key={boxNumber} style={styles.boxItem}>
+            <Animated.View
+              key={boxNumber}
+              style={styles.boxItem}
+              entering={FadeIn.delay(100 * index).duration(400)}
+            >
               <ThemedView style={styles.boxLabelContainer}>
-                <ThemedText style={[styles.boxLabel, { color: text }]}>
-                  Boîte {boxNumber}
-                </ThemedText>
+                <ThemedView style={styles.boxLabelGroup}>
+                  <View
+                    style={[
+                      styles.boxColorIndicator,
+                      { backgroundColor: colors[index] },
+                    ]}
+                  />
+                  <ThemedText style={[styles.boxLabel, { color: text }]}>
+                    Boîte {boxNumber}
+                  </ThemedText>
+                </ThemedView>
                 <ThemedText style={[styles.boxCount, { color: text }]}>
                   {count}
                 </ThemedText>
@@ -155,13 +176,16 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
                   ? `Révision tous les ${LEITNER_BOX_INTERVALS[index]} jours`
                   : "Maîtrisée"}
               </ThemedText>
-            </ThemedView>
+            </Animated.View>
           );
         })}
       </ThemedView>
 
-      {/* Activité de révision */}
-      <ThemedView style={[styles.activityContainer, { backgroundColor: border }]}>
+      {/* Review activity */}
+      <Animated.View
+        style={[styles.activityContainer, { backgroundColor: border }]}
+        entering={FadeIn.delay(500).duration(400)}
+      >
         <ThemedView style={styles.activityItem}>
           <IconSymbol name="chart.bar.fill" size={20} color={primary} />
           <ThemedText style={[styles.activityText, { color: text }]}>
@@ -176,56 +200,75 @@ export function FlashcardStats({ flashcards }: FlashcardStatsProps) {
             cartes révisées au moins une fois
           </ThemedText>
         </ThemedView>
-      </ThemedView>
+      </Animated.View>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 10,
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 12,
   },
   generalStats: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 24,
+    alignItems: "center",
   },
   statItem: {
     alignItems: "center",
     flex: 1,
   },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(150, 150, 150, 0.2)",
+  },
   statValue: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
-    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 16,
+    letterSpacing: 0.2,
   },
   boxesContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   boxItem: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   boxLabelContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  boxLabelGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  boxColorIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
   },
   boxLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "500",
   },
   boxCount: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: "600",
   },
   progressBarContainer: {
     height: 8,
@@ -239,27 +282,31 @@ const styles = StyleSheet.create({
   },
   boxInfo: {
     fontSize: 12,
+    marginTop: 2,
   },
   activityContainer: {
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
   },
   activityItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   activityText: {
-    marginLeft: 8,
+    marginLeft: 10,
     fontSize: 14,
   },
   emptyContainer: {
-    padding: 20,
-    borderRadius: 10,
+    padding: 24,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
   emptyText: {
     textAlign: "center",
+    marginTop: 16,
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

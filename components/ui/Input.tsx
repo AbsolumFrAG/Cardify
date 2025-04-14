@@ -17,6 +17,7 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 
@@ -36,6 +37,7 @@ interface InputProps extends TextInputProps {
   variant?: "outlined" | "filled" | "underlined";
   onRightIconPress?: () => void;
   onLeftIconPress?: () => void;
+  fullWidth?: boolean;
 }
 
 const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
@@ -56,6 +58,7 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
     value,
     onChangeText,
     placeholder,
+    fullWidth = false,
     ...rest
   },
   ref
@@ -64,24 +67,36 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const inputFocus = useSharedValue(0);
+  const shake = useSharedValue(0);
 
-  // Gérer l'animation de focus
+  // Enhanced focus animation
   const handleFocus = () => {
     setIsFocused(true);
-    inputFocus.value = withTiming(1, { duration: 200 });
+    inputFocus.value = withTiming(1, { duration: 250 });
   };
 
   const handleBlur = () => {
     setIsFocused(false);
-    inputFocus.value = withTiming(0, { duration: 200 });
+    inputFocus.value = withTiming(0, { duration: 250 });
   };
 
-  // Basculer la visibilité du mot de passe
+  // Function to shake the input if there's an error
+  const shakeInput = () => {
+    shake.value = withSequence(
+      withTiming(-5, { duration: 50 }),
+      withTiming(5, { duration: 50 }),
+      withTiming(-4, { duration: 50 }),
+      withTiming(4, { duration: 50 }),
+      withTiming(0, { duration: 50 })
+    );
+  };
+
+  // Toggle password visibility
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
-  // Styles animés
+  // Enhanced container animation with shake
   const containerAnimatedStyle = useAnimatedStyle(() => {
     let borderColor;
 
@@ -97,27 +112,29 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
 
     return {
       borderColor,
-      borderWidth: variant === "underlined" ? 0 : 1,
-      borderBottomWidth: variant === "underlined" ? 1 : 1,
+      transform: [{ translateX: shake.value }],
+      borderWidth: variant === "underlined" ? 0 : 1.5,
+      borderBottomWidth: variant === "underlined" ? 1.5 : 1.5,
       backgroundColor:
         variant === "filled"
           ? isDark
             ? "rgba(41, 42, 43, 0.8)"
-            : "rgba(0, 0, 0, 0.03)"
+            : "rgba(0, 0, 0, 0.04)"
           : colors.input,
     };
   });
 
+  // Animated label for enhanced floating experience
   const labelAnimatedStyle = useAnimatedStyle(() => {
     if (!label) return {};
 
     const fontSize = withTiming(isFocused || value ? 12 : 16, {
-      duration: 200,
+      duration: 250,
     });
 
     const top = withTiming(
-      isFocused || value ? -8 : variant === "underlined" ? 8 : 12,
-      { duration: 200 }
+      isFocused || value ? -10 : variant === "underlined" ? 8 : 14,
+      { duration: 250 }
     );
 
     const color = error
@@ -128,38 +145,42 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
           [colors.textSecondary, colors.primary]
         );
 
+    const scale = withTiming(isFocused || value ? 0.85 : 1, { duration: 250 });
+
     return {
       fontSize,
       top,
       color,
+      transform: [{ scale }],
       backgroundColor: variant === "filled" ? "transparent" : colors.background,
-      paddingHorizontal: variant === "filled" ? 0 : 4,
+      paddingHorizontal: variant === "filled" ? 0 : 6,
+      zIndex: 10,
     };
   });
 
-  // Gérer les styles selon la variante
+  // Enhanced variant styles
   const getVariantStyles = () => {
     switch (variant) {
       case "outlined":
         return {
           container: {
-            borderRadius: 8,
+            borderRadius: 12,
           },
           input: {
-            paddingHorizontal: leftIcon ? 8 : 12,
+            paddingHorizontal: leftIcon ? 8 : 16,
           },
         };
       case "filled":
         return {
           container: {
-            borderRadius: 8,
-            borderTopLeftRadius: 4,
-            borderTopRightRadius: 4,
+            borderRadius: 12,
+            borderTopLeftRadius: 8,
+            borderTopRightRadius: 8,
             borderWidth: 0,
             borderBottomWidth: 2,
           },
           input: {
-            paddingHorizontal: leftIcon ? 8 : 12,
+            paddingHorizontal: leftIcon ? 8 : 16,
           },
         };
       case "underlined":
@@ -175,10 +196,10 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
       default:
         return {
           container: {
-            borderRadius: 8,
+            borderRadius: 12,
           },
           input: {
-            paddingHorizontal: leftIcon ? 8 : 12,
+            paddingHorizontal: leftIcon ? 8 : 16,
           },
         };
     }
@@ -186,16 +207,22 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
 
   const variantStyles = getVariantStyles();
 
+  // Effect to shake input when error changes
+  if (error) {
+    setTimeout(() => shakeInput(), 100);
+  }
+
   return (
-    <View style={[styles.wrapper, containerStyle]}>
+    <View
+      style={[styles.wrapper, fullWidth && styles.fullWidth, containerStyle]}
+    >
       {label && (
         <Animated.View
           style={[
             styles.labelContainer,
             {
-              zIndex: 1,
-              left: leftIcon ? 36 : 12,
-              paddingHorizontal: variant === "underlined" ? 0 : 4,
+              left: leftIcon ? 42 : 16,
+              paddingHorizontal: variant === "underlined" ? 0 : 6,
             },
             labelAnimatedStyle,
           ]}
@@ -210,7 +237,7 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
           styles.container,
           variantStyles.container,
           {
-            paddingHorizontal: variant === "underlined" ? 0 : 12,
+            paddingHorizontal: variant === "underlined" ? 0 : 16,
           },
           containerAnimatedStyle,
         ]}
@@ -224,7 +251,9 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
             <IconSymbol
               name={leftIcon as any}
               size={20}
-              color={error ? colors.error : colors.icon}
+              color={
+                isFocused ? colors.primary : error ? colors.error : colors.icon
+              }
             />
           </TouchableOpacity>
         )}
@@ -242,16 +271,17 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
             {
               color: colors.text,
               paddingLeft: leftIcon
-                ? 32
+                ? 36
                 : variantStyles.input.paddingHorizontal,
               paddingRight:
                 rightIcon || secureTextEntry
-                  ? 40
+                  ? 44
                   : variantStyles.input.paddingHorizontal,
             },
             inputStyle,
           ]}
           secureTextEntry={secureTextEntry && !isPasswordVisible}
+          selectionColor={colors.primary}
           {...rest}
         />
 
@@ -259,6 +289,7 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
           <TouchableOpacity
             onPress={togglePasswordVisibility}
             style={styles.rightIcon}
+            activeOpacity={0.7}
           >
             <IconSymbol
               name={isPasswordVisible ? ("eye.slash" as any) : ("eye" as any)}
@@ -273,25 +304,55 @@ const InputBase: ForwardRefRenderFunction<TextInput, InputProps> = (
             onPress={onRightIconPress}
             disabled={!onRightIconPress}
             style={styles.rightIcon}
+            activeOpacity={0.7}
           >
-            <IconSymbol name={rightIcon as any} size={20} color={colors.icon} />
+            <IconSymbol
+              name={rightIcon as any}
+              size={20}
+              color={isFocused ? colors.primary : colors.icon}
+            />
           </TouchableOpacity>
         )}
       </AnimatedView>
 
       {(helperText || error) && (
-        <ThemedText
+        <Animated.View
           style={[
-            styles.helperText,
+            styles.helperContainer,
             {
-              color: error ? colors.error : colors.textSecondary,
-              marginLeft: leftIcon ? 36 : 12,
+              opacity: withTiming(helperText || error ? 1 : 0, {
+                duration: 200,
+              }),
+              transform: [
+                {
+                  translateY: withTiming(helperText || error ? 0 : -10, {
+                    duration: 200,
+                  }),
+                },
+              ],
             },
-            helperStyle,
           ]}
         >
-          {error || helperText}
-        </ThemedText>
+          {error && (
+            <IconSymbol
+              name="exclamationmark.circle"
+              size={14}
+              color={colors.error}
+              style={styles.helperIcon}
+            />
+          )}
+          <ThemedText
+            style={[
+              styles.helperText,
+              {
+                color: error ? colors.error : colors.textSecondary,
+              },
+              helperStyle,
+            ]}
+          >
+            {error || helperText}
+          </ThemedText>
+        </Animated.View>
       )}
     </View>
   );
@@ -301,38 +362,51 @@ export const Input = forwardRef(InputBase);
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  fullWidth: {
+    width: "100%",
   },
   container: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 56,
+    minHeight: 60,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    minHeight: 42,
-    paddingVertical: Platform.OS === "ios" ? 12 : 8,
+    minHeight: 46,
+    paddingVertical: Platform.OS === "ios" ? 14 : 10,
   },
   labelContainer: {
     position: "absolute",
     backgroundColor: "transparent",
+    paddingHorizontal: 4,
   },
   label: {
-    fontSize: 14,
+    fontSize: 15,
+  },
+  helperContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    marginLeft: 16,
+  },
+  helperIcon: {
+    marginRight: 6,
   },
   helperText: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 13,
   },
   leftIcon: {
     position: "absolute",
-    left: 12,
+    left: 16,
     zIndex: 1,
   },
   rightIcon: {
     position: "absolute",
-    right: 12,
+    right: 16,
     zIndex: 1,
+    padding: 4,
   },
 });

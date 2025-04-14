@@ -54,10 +54,7 @@ export default {
       ],
     ],
     extra: {
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      pineconeApiKey: process.env.PINECONE_API_KEY,
-      pineconeEnvironment: process.env.PINECONE_ENVIRONMENT,
-      pineconeIndex: process.env.PINECONE_INDEX,
+      apiUrl: process.env.API_URL || "http://localhost:8000",
       eas: {
         projectId: "8ee92364-5ea8-419c-b26b-43b55c11ccb4",
       },

@@ -61,7 +61,7 @@ export function Button({
     onPressOut: animatedPressOut,
   } = useButtonAnimation();
 
-  // Gestion des animations de pression
+  // Enhanced press handling with haptic feedback simulation
   const handlePressIn = (e: any) => {
     animatedPressIn();
     onPressIn?.(e);
@@ -72,20 +72,27 @@ export function Button({
     onPressOut?.(e);
   };
 
-  // Déterminer les styles selon la variante
+  // Enhanced variant styles with more visual depth
   const getVariantStyles = () => {
     switch (variant) {
       case "primary":
         return {
           backgroundColor: disabled ? colors.primaryLight : colors.primary,
           borderColor: "transparent",
+          // Add subtle inner shadow for depth
+          shadowColor: "rgba(0,0,0,0.1)",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.8,
+          shadowRadius: 2,
+          elevation: 3,
         };
       case "secondary":
         return {
           backgroundColor: isDark
             ? "rgba(54, 179, 255, 0.15)"
             : "rgba(0, 153, 255, 0.1)",
-          borderColor: "transparent",
+          borderColor: colors.primary,
+          borderWidth: 1,
         };
       case "outline":
         return {
@@ -102,6 +109,12 @@ export function Button({
         return {
           backgroundColor: disabled ? "rgba(244, 67, 54, 0.6)" : colors.error,
           borderColor: "transparent",
+          // Add subtle inner shadow for depth
+          shadowColor: "rgba(0,0,0,0.1)",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.8,
+          shadowRadius: 2,
+          elevation: 2,
         };
       default:
         return {
@@ -111,57 +124,57 @@ export function Button({
     }
   };
 
-  // Déterminer le style du texte selon la variante
+  // Fixed: use specific values for fontWeight that match React Native's TextStyle type
   const getTextStyles = () => {
     switch (variant) {
       case "primary":
-        return { color: "#FFFFFF" };
+        return { color: "#FFFFFF", fontWeight: "600" as const };
       case "secondary":
-        return { color: colors.primary };
+        return { color: colors.primary, fontWeight: "600" as const };
       case "outline":
-        return { color: colors.text };
+        return { color: colors.text, fontWeight: "500" as const };
       case "ghost":
-        return { color: colors.primary };
+        return { color: colors.primary, fontWeight: "500" as const };
       case "danger":
-        return { color: "#FFFFFF" };
+        return { color: "#FFFFFF", fontWeight: "600" as const };
       default:
-        return { color: "#FFFFFF" };
+        return { color: "#FFFFFF", fontWeight: "600" as const };
     }
   };
 
-  // Déterminer les styles selon la taille
+  // Improved size configurations for better touch targets
   const getSizeStyles = () => {
     switch (size) {
       case "small":
         return {
           paddingVertical: 8,
-          paddingHorizontal: 12,
-          minHeight: 36,
-          borderRadius: 8,
+          paddingHorizontal: 16,
+          minHeight: 38,
+          borderRadius: 10,
           fontSize: 14,
         };
       case "medium":
         return {
           paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 44,
-          borderRadius: 10,
+          paddingHorizontal: 20,
+          minHeight: 48,
+          borderRadius: 12,
           fontSize: 16,
         };
       case "large":
         return {
-          paddingVertical: 14,
-          paddingHorizontal: 20,
-          minHeight: 52,
-          borderRadius: 12,
+          paddingVertical: 16,
+          paddingHorizontal: 24,
+          minHeight: 56,
+          borderRadius: 14,
           fontSize: 16,
         };
       default:
         return {
           paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 44,
-          borderRadius: 10,
+          paddingHorizontal: 20,
+          minHeight: 48,
+          borderRadius: 12,
           fontSize: 16,
         };
     }
@@ -171,6 +184,7 @@ export function Button({
   const sizeStyles = getSizeStyles();
   const textStyles = getTextStyles();
 
+  // Optimized icon sizing
   const getIconSize = () => {
     switch (size) {
       case "small":
@@ -178,7 +192,7 @@ export function Button({
       case "medium":
         return 18;
       case "large":
-        return 20;
+        return 22;
       default:
         return 18;
     }
@@ -187,10 +201,22 @@ export function Button({
   const iconSize = getIconSize();
   const iconColor = textStyles.color as string;
 
-  // Rendu du contenu du bouton
+  // Enhanced loading state with better visual feedback
   const renderContent = () => {
     if (isLoading) {
-      return <ActivityIndicator size="small" color={iconColor} />;
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={iconColor} />
+          <ThemedText
+            style={[
+              styles.loadingText,
+              { fontSize: sizeStyles.fontSize - 2, color: textStyles.color },
+            ]}
+          >
+            {typeof children === "string" ? children : "Chargement..."}
+          </ThemedText>
+        </View>
+      );
     }
 
     return (
@@ -208,7 +234,11 @@ export function Button({
         <ThemedText
           style={[
             styles.text,
-            { fontSize: sizeStyles.fontSize, color: textStyles.color },
+            {
+              fontSize: sizeStyles.fontSize,
+              color: textStyles.color,
+              fontWeight: textStyles.fontWeight,
+            },
             textStyle,
           ]}
         >
@@ -230,7 +260,7 @@ export function Button({
 
   return (
     <AnimatedTouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       disabled={disabled || isLoading}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -267,11 +297,21 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: "600",
     textAlign: "center",
+    letterSpacing: 0.3,
   },
   iconLeft: {
-    marginRight: 8,
+    marginRight: 10,
   },
   iconRight: {
+    marginLeft: 10,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
     marginLeft: 8,
+    fontWeight: "500",
   },
 });

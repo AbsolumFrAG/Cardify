@@ -110,42 +110,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="contents"
-        options={{
-          title: "Contenu",
-          tabBarIcon: ({ color, focused }) => (
-            <Animated.View
-              style={[
-                styles.iconContainer,
-                focused && styles.activeIconContainer,
-              ]}
-            >
-              <IconSymbol size={24} name="doc.text.fill" color={color} />
-            </Animated.View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="quiz"
-        options={{
-          title: "Quiz",
-          tabBarIcon: ({ color, focused }) => (
-            <Animated.View
-              style={[
-                styles.iconContainer,
-                focused && styles.activeIconContainer,
-              ]}
-            >
-              <IconSymbol
-                size={24}
-                name="questionmark.square.fill"
-                color={color}
-              />
-            </Animated.View>
-          ),
-        }}
-      />
     </Tabs>
   );
 }

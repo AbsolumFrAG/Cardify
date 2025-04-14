@@ -1,90 +1,110 @@
 /**
- * Thème Cardify – Médecine équilibrée : Vert & Gris doux
- * Texte principal en gris, accents en vert
+ * Thème Cardify – Direction artistique rose-violet avec accent noir
+ * Inspiré du logo de l'application
  */
 
-const green = '#16877e';      // Accent principal
-const grey = '#4D5E6C';       // Texte principal (gris doux)
-const greyTertiary = '#6C7A89'; // Texte tertiaire
-const white = '#FFFFFF';      // Fond
-const softGrey = '#F1F3F5';   // Fond secondaire
+// Couleurs principales extraites du logo
+const pink = "#f17cd5"; // Rose principal
+const violet = "#d083f1"; // Violet principal
+const black = "#212121"; // Noir profond pour le texte et les accents
+const white = "#FFFFFF"; // Blanc pour les contrastes
+const lightPink = "#faf0f8"; // Rose très clair pour les fonds
+
+// Dégradés principaux
+const primaryGradient = [pink, violet];
+const secondaryGradient = [lightPink, pink];
+
+// Couleurs pour les boîtes Leitner
+const boxColors = {
+  1: "#ff7eb3", // Rose vif pour la boîte 1
+  2: "#ff9cee", // Rose clair pour la boîte 2
+  3: "#c78fff", // Violet clair pour la boîte 3
+  4: "#9d7aff", // Violet pour la boîte 4
+  5: violet, // Violet principal pour la boîte 5
+};
 
 export const Colors = {
   light: {
-    text: grey,
-    textSecondary: green,
-    textTertiary: greyTertiary,
+    text: black,
+    textSecondary: pink,
+    textTertiary: "#6d6d6d",
 
     background: white,
-    backgroundSecondary: softGrey,
-    backgroundTertiary: '#E8ECEF',
+    backgroundSecondary: lightPink,
+    backgroundTertiary: "#f5e7f7",
 
-    tint: green,
-    primary: green,
-    primaryLight: '#3DAA9C',
-    primaryDark: '#0D5C55',
-    secondary: green,
-    icon: green,
+    tint: pink,
+    primary: pink,
+    primaryLight: "#f59ddd",
+    primaryDark: "#ce58b3",
+    secondary: violet,
+    icon: pink,
 
-    border: '#D0D8DA',
-    borderLight: '#E2E8EA',
-    shadow: 'rgba(0, 0, 0, 0.04)',
+    border: "#f5d4f7",
+    borderLight: "#f9e5fb",
+    shadow: "rgba(241, 124, 213, 0.15)",
 
     card: white,
     input: white,
-    tabIconDefault: greyTertiary,
-    tabIconSelected: green,
-    tabBar: 'rgba(255, 255, 255, 0.95)',
+    tabIconDefault: "#aaaaaa",
+    tabIconSelected: pink,
+    tabBar: "rgba(255, 255, 255, 0.95)",
 
-    success: green,
-    warning: green,
-    error: green,
-    info: green,
+    success: "#66bb6a",
+    warning: "#ffb74d",
+    error: "#ff7674",
+    info: "#64b5f6",
 
-    gradientPrimary: [green, grey],
-    gradientSecondary: ['#DDECF1', green],
+    gradientPrimary: primaryGradient,
+    gradientSecondary: secondaryGradient,
+
+    boxColors,
   },
 
   dark: {
     text: white,
-    textSecondary: green,
-    textTertiary: greyTertiary,
+    textSecondary: pink,
+    textTertiary: "#b8b8b8",
 
-    background: '#121616',
-    backgroundSecondary: '#1A2020',
-    backgroundTertiary: '#1F2A2A',
+    background: "#121212",
+    backgroundSecondary: "#1e1e1e",
+    backgroundTertiary: "#2d2d2d",
 
-    tint: green,
-    primary: green,
-    primaryLight: '#3DAA9C',
-    primaryDark: '#0D5C55',
-    secondary: green,
-    icon: green,
+    tint: pink,
+    primary: pink,
+    primaryLight: "#f59ddd",
+    primaryDark: "#ce58b3",
+    secondary: violet,
+    icon: pink,
 
-    border: '#2A3B3A',
-    borderLight: '#3A4D4D',
-    shadow: 'rgba(0, 0, 0, 0.15)',
+    border: "#383838",
+    borderLight: "#484848",
+    shadow: "rgba(0, 0, 0, 0.4)",
 
-    card: '#1E2626',
-    input: '#2B3C3A',
-    tabIconDefault: greyTertiary,
-    tabIconSelected: green,
-    tabBar: 'rgba(24, 32, 30, 0.95)',
+    card: "#242424",
+    input: "#333333",
+    tabIconDefault: "#888888",
+    tabIconSelected: pink,
+    tabBar: "rgba(18, 18, 18, 0.95)",
 
-    success: green,
-    warning: green,
-    error: green,
-    info: green,
+    success: "#66bb6a",
+    warning: "#ffb74d",
+    error: "#ff7674",
+    info: "#64b5f6",
 
-    gradientPrimary: [green, '#0D5C55'],
-    gradientSecondary: ['#223F3F', green],
+    gradientPrimary: primaryGradient,
+    gradientSecondary: ["#3d2d3d", pink],
+
+    boxColors,
   },
 };
 
 export const palettes = {
-  green,
-  grey,
-  greyTertiary,
+  pink,
+  violet,
+  black,
   white,
-  softGrey,
+  lightPink,
+  primaryGradient,
+  secondaryGradient,
 };

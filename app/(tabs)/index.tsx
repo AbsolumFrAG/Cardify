@@ -1,24 +1,29 @@
 import { FlashcardStats } from "@/components/FlashcardStats";
-import { HeroCard } from "@/components/HeroCard";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import { useTheme } from "@/context/ThemeContext";
 import { useFlashcards } from "@/context/FlashcardContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useScreenTransition } from "@/hooks/useAnimations";
 import { getDueFlashcards } from "@/services/leitnerSystem";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
-  FadeInUp,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
+const HEADER_HEIGHT = 60;
 
 export default function HomeScreen() {
   const { flashcards } = useFlashcards();
@@ -26,7 +31,31 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const { screenStyle, show } = useScreenTransition(true);
 
-  // Animation d'entrée
+  // Animated scroll for header effect
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  // Animated header style
+  const headerStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(scrollY.value, [0, 50], [0, 1], {
+      extrapolateRight: "clamp",
+    });
+
+    return {
+      opacity,
+      backgroundColor: isDark
+        ? `rgba(18, 18, 18, ${opacity * 0.9})`
+        : `rgba(255, 255, 255, ${opacity * 0.9})`,
+      borderBottomWidth: opacity * StyleSheet.hairlineWidth,
+      transform: [{ translateY: withSpring(0) }],
+    };
+  });
+
+  // Animation entrance
   useEffect(() => {
     show(800);
   }, []);
@@ -44,69 +73,199 @@ export default function HomeScreen() {
     router.push("/flashcard/review");
   };
 
-  const handleSearch = () => {
-    router.push("/search");
+  const handleCreateFlashcard = () => {
+    router.push("/flashcard/create");
   };
 
   return (
     <ThemedView style={styles.container}>
+      {/* Animated header overlay */}
       <Animated.View
-        style={[styles.header, { backgroundColor: colors.background }]}
-        entering={FadeIn.duration(400)}
+        style={[
+          styles.headerOverlay,
+          { borderBottomColor: colors.border },
+          headerStyle,
+        ]}
       >
-        <ThemedText type="title">Cardify</ThemedText>
-        <Button
-          variant="ghost"
-          size="medium"
-          leftIcon="magnifyingglass"
-          onPress={handleSearch}
-          style={styles.searchButton}
-        >
-          Rechercher
-        </Button>
+        <ThemedText type="subtitle">Cardify</ThemedText>
       </Animated.View>
 
-      <ScrollView
+      {/* Main content */}
+      <Animated.ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
           styles.contentContainer,
           { backgroundColor: colors.backgroundSecondary },
         ]}
         showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
       >
+        {/* Header area with title */}
+        <Animated.View
+          style={[styles.header, { backgroundColor: "transparent" }]}
+          entering={FadeIn.duration(400)}
+        >
+          <View>
+            <ThemedText type="title">Cardify</ThemedText>
+            <ThemedText
+              style={styles.subtitle}
+              lightColor="rgba(0,0,0,0.6)"
+              darkColor="rgba(255,255,255,0.6)"
+            >
+              Votre assistant de mémorisation
+            </ThemedText>
+          </View>
+        </Animated.View>
+
+        {/* Hero card for camera capture */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(700).springify()}
         >
-          <HeroCard
-            title="Capture des notes"
-            description="Prenez une photo de vos notes pour créer des flashcards automatiquement"
-            actionLabel="Capturer"
-            onAction={handleCapture}
-            imageSource={require("@/assets/images/camera.png")}
-          />
+          <Card
+            variant="gradient"
+            gradientColors={
+              isDark ? ["#1e3a45", "#0d566e"] : ["#e1f5fe", "#b3e5fc"]
+            }
+            onPress={handleCapture}
+            style={styles.heroCard}
+          >
+            <LinearGradient
+              colors={
+                isDark
+                  ? ["rgba(0,0,0,0.3)", "transparent"]
+                  : ["rgba(255,255,255,0.4)", "transparent"]
+              }
+              style={styles.heroGradientOverlay}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+            <Card.Content style={styles.heroCardContent}>
+              <View style={styles.heroTextContainer}>
+                <View style={styles.heroIconContainer}>
+                  <IconSymbol name="camera.fill" size={24} color="#fff" />
+                </View>
+                <ThemedText style={styles.heroTitle}>
+                  Capture tes notes
+                </ThemedText>
+                <ThemedText style={styles.heroDescription}>
+                  Prends une photo de tes notes et crée des flashcards
+                  automatiquement
+                </ThemedText>
+                <Button
+                  variant="primary"
+                  size="medium"
+                  style={styles.heroButton}
+                  onPress={handleCapture}
+                >
+                  Capturer
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
         </Animated.View>
 
+        {/* Actionable quick cards */}
+        <View style={styles.quickActionsContainer}>
+          <Animated.View
+            style={styles.quickActionRow}
+            entering={FadeInDown.delay(200).duration(500)}
+          >
+            <Card
+              variant="elevated"
+              style={styles.quickActionCard}
+              onPress={handleCreateFlashcard}
+              fullWidth={false}
+              compact={true}
+              elevation={2}
+            >
+              <Card.Content style={styles.quickActionContent} padded={true}>
+                <View
+                  style={[
+                    styles.quickActionIcon,
+                    { backgroundColor: colors.primaryLight },
+                  ]}
+                >
+                  <IconSymbol name="plus" size={18} color={colors.primary} />
+                </View>
+                <ThemedText style={styles.quickActionText}>
+                  Créer une flashcard
+                </ThemedText>
+              </Card.Content>
+            </Card>
+
+            <Card
+              variant="elevated"
+              style={styles.quickActionCard}
+              onPress={() => router.push("/flashcards")}
+              fullWidth={false}
+              compact={true}
+              elevation={2}
+            >
+              <Card.Content style={styles.quickActionContent} padded={true}>
+                <View
+                  style={[
+                    styles.quickActionIcon,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(208, 131, 241, 0.2)"
+                        : "rgba(208, 131, 241, 0.1)",
+                    },
+                  ]}
+                >
+                  <IconSymbol
+                    name="square.stack.fill"
+                    size={18}
+                    color={colors.secondary}
+                  />
+                </View>
+                <ThemedText style={styles.quickActionText}>
+                  Voir mes flashcards
+                </ThemedText>
+              </Card.Content>
+            </Card>
+          </Animated.View>
+        </View>
+
+        {/* Stats panel */}
         <Animated.View
-          entering={FadeInDown.delay(200).duration(700).springify()}
+          entering={FadeInDown.delay(300).duration(700).springify()}
         >
           <View style={styles.statsContainer}>
-            <ThemedText type="subtitle">Votre progression</ThemedText>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              <IconSymbol
+                name="chart.bar.fill"
+                size={18}
+                color={colors.primary}
+                style={styles.sectionIcon}
+              />
+              Votre progression
+            </ThemedText>
             <FlashcardStats flashcards={flashcards} />
           </View>
         </Animated.View>
 
+        {/* Review card for due cards */}
         {dueCards > 0 && (
           <Animated.View
-            entering={FadeInDown.delay(300).duration(700).springify()}
+            entering={FadeInDown.delay(400).duration(700).springify()}
           >
             <Card
               variant="gradient"
               gradientColors={
-                isDark ? ["#1e3a45", "#0d566e"] : ["#e1f5fe", "#b3e5fc"]
+                isDark ? ["#3d2d3d", colors.primary] : ["#faf0f8", "#f9e5fb"]
               }
               style={styles.reviewCard}
+              onPress={handleStartReview}
             >
               <Card.Content style={styles.reviewCardContent}>
+                <View style={styles.reviewCardIconContainer}>
+                  <IconSymbol
+                    name="sparkles"
+                    size={28}
+                    color={isDark ? "#FFC107" : colors.primary}
+                  />
+                </View>
                 <View style={styles.reviewCardTextContainer}>
                   <ThemedText
                     type="defaultSemiBold"
@@ -117,102 +276,45 @@ export default function HomeScreen() {
                   <ThemedText style={styles.reviewCardDescription}>
                     Continuez votre routine de révision pour ne rien oublier !
                   </ThemedText>
-                </View>
-                <View style={styles.reviewCardIconContainer}>
-                  <IconSymbol
-                    name="sparkles"
-                    size={28}
-                    color={isDark ? "#FFC107" : colors.primary}
-                  />
+                  <Button
+                    variant={isDark ? "outline" : "secondary"}
+                    size="small"
+                    leftIcon="arrow.counterclockwise"
+                    onPress={handleStartReview}
+                    style={styles.reviewButton}
+                  >
+                    Réviser maintenant
+                  </Button>
                 </View>
               </Card.Content>
-              <Card.Footer>
-                <Button
-                  variant="primary"
-                  size="medium"
-                  leftIcon="arrow.counterclockwise"
-                  onPress={handleStartReview}
-                  fullWidth
-                >
-                  Réviser maintenant
-                </Button>
-              </Card.Footer>
             </Card>
           </Animated.View>
         )}
 
+        {/* Tips card */}
         <Animated.View
-          style={styles.quickActions}
-          entering={FadeInUp.delay(400).duration(700).springify()}
+          entering={FadeInDown.delay(500).duration(700).springify()}
         >
-          <ThemedText type="subtitle">Actions rapides</ThemedText>
-          <View style={styles.actionsGrid}>
-            <Card
-              style={styles.actionButton}
-              onPress={() => router.push("/flashcards")}
-              variant="elevated"
-            >
-              <Card.Content style={styles.actionButtonContent}>
-                <IconSymbol
-                  name="square.stack.fill"
-                  size={32}
-                  color={colors.primary}
-                />
-                <ThemedText style={styles.actionText}>
-                  Mes Flashcards
+          <Card variant="outlined" style={styles.tipsCard}>
+            <Card.Content>
+              <View style={styles.tipsHeader}>
+                <IconSymbol name="lightbulb.fill" size={20} color="#FFC107" />
+                <ThemedText style={styles.tipsTitle}>
+                  Conseil pour réussir
                 </ThemedText>
-              </Card.Content>
-            </Card>
-
-            <Card
-              style={styles.actionButton}
-              onPress={() => router.push("/flashcard/create")}
-              variant="elevated"
-            >
-              <Card.Content style={styles.actionButtonContent}>
-                <IconSymbol
-                  name="plus.square.fill"
-                  size={32}
-                  color={colors.primary}
-                />
-                <ThemedText style={styles.actionText}>
-                  Créer une carte
-                </ThemedText>
-              </Card.Content>
-            </Card>
-
-            <Card
-              style={styles.actionButton}
-              onPress={() => router.push("/contents")}
-              variant="elevated"
-            >
-              <Card.Content style={styles.actionButtonContent}>
-                <IconSymbol
-                  name="doc.text.fill"
-                  size={32}
-                  color={colors.primary}
-                />
-                <ThemedText style={styles.actionText}>Mes cours</ThemedText>
-              </Card.Content>
-            </Card>
-
-            <Card
-              style={styles.actionButton}
-              onPress={() => router.push("/quiz")}
-              variant="elevated"
-            >
-              <Card.Content style={styles.actionButtonContent}>
-                <IconSymbol
-                  name="questionmark.square.fill"
-                  size={32}
-                  color={colors.primary}
-                />
-                <ThemedText style={styles.actionText}>Quiz IA</ThemedText>
-              </Card.Content>
-            </Card>
-          </View>
+              </View>
+              <ThemedText style={styles.tipsText}>
+                Réviser régulièrement est plus efficace que de longues sessions
+                espacées. Essayez de réviser vos flashcards chaque jour pendant
+                5-10 minutes.
+              </ThemedText>
+            </Card.Content>
+          </Card>
         </Animated.View>
-      </ScrollView>
+
+        {/* Bottom spacing */}
+        <View style={styles.bottomSpacing} />
+      </Animated.ScrollView>
     </ThemedView>
   );
 }
@@ -221,35 +323,141 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  headerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_HEIGHT,
+    zIndex: 100,
     alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  header: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0,0,0,0.1)",
+    marginBottom: 12,
   },
-  searchButton: {
-    borderRadius: 20,
+  subtitle: {
+    fontSize: 15,
+    marginTop: 2,
+    marginBottom: 6,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   statsContainer: {
-    marginVertical: 16,
+    marginVertical: 12,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    marginBottom: 12,
+    marginLeft: 4,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sectionIcon: {
+    marginRight: 8,
+  },
+  quickActionsContainer: {
+    padding: 16,
+  },
+  quickActionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quickActionCard: {
+    width: (width - 48) / 2,
+    margin: 0,
+  },
+  quickActionContent: {
+    alignItems: "flex-start",
+    padding: 16,
+  },
+  quickActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  heroCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    position: "relative",
+    overflow: "hidden",
+  },
+  heroGradientOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "100%",
+    zIndex: 1,
+  },
+  heroCardContent: {
+    padding: 20,
+    zIndex: 2,
+  },
+  heroTextContainer: {
+    flex: 3,
+    paddingRight: 20,
+  },
+  heroIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 8,
+  },
+  heroDescription: {
+    fontSize: 14,
+    color: "#fff",
+    opacity: 0.9,
+    marginBottom: 16,
+  },
+  heroButton: {
+    alignSelf: "flex-start",
+  },
+  heroImageContainer: {
+    flex: 2,
   },
   reviewCard: {
-    marginVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 16,
   },
   reviewCardContent: {
     flexDirection: "row",
     alignItems: "center",
+    padding: 16,
+  },
+  reviewCardIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
   reviewCardTextContainer: {
     flex: 1,
@@ -261,34 +469,31 @@ const styles = StyleSheet.create({
   reviewCardDescription: {
     fontSize: 14,
     opacity: 0.8,
+    marginBottom: 12,
   },
-  reviewCardIconContainer: {
-    marginLeft: 16,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.2)",
+  reviewButton: {
+    alignSelf: "flex-start",
   },
-  quickActions: {
-    marginTop: 8,
+  tipsCard: {
+    marginHorizontal: 16,
     marginBottom: 16,
   },
-  actionsGrid: {
+  tipsHeader: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-  actionButton: {
-    width: (width - 40) / 2,
-    marginBottom: 16,
-  },
-  actionButtonContent: {
     alignItems: "center",
-    padding: 16,
+    marginBottom: 12,
   },
-  actionText: {
-    marginTop: 12,
-    textAlign: "center",
-    fontFamily: "PoppinsMedium",
+  tipsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  tipsText: {
+    fontSize: 14,
+    lineHeight: 22,
+    opacity: 0.8,
+  },
+  bottomSpacing: {
+    height: 40,
   },
 });

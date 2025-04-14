@@ -5,7 +5,7 @@ import { Flashcard } from "@/types/flashcard";
 import { formatRelativeDate } from "@/utils/dateUtils";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -17,7 +17,7 @@ import Animated, {
 import { ThemedText } from "./ThemedText";
 import { IconSymbol } from "./ui/IconSymbol";
 
-const AnimatedTouchableOpacity = 
+const AnimatedTouchableOpacity =
   Animated.createAnimatedComponent(TouchableOpacity);
 
 interface FlashcardItemProps {
@@ -35,34 +35,55 @@ export function FlashcardItem({
   const [isFlipped, setIsFlipped] = useState(false);
   const rotate = useSharedValue(0);
   const scale = useSharedValue(1);
+  const elevation = useSharedValue(isDark ? 5 : 3);
 
-  // Animation à l'apparition
+  // Enhanced entry animation
   useEffect(() => {
     scale.value = withSequence(
       withTiming(0.95, { duration: 10 }),
-      withTiming(1, { duration: 400, easing: Easing.elastic(1.2) })
+      withTiming(1, {
+        duration: 500,
+        easing: Easing.elastic(1.1),
+      })
     );
   }, []);
 
+  // Enhanced flip animation with better timing
   const flipCard = () => {
     const newValue = isFlipped ? 0 : 1;
+
+    // Increase elevation during flip for better 3D effect
+    elevation.value = withSequence(
+      withTiming(isDark ? 8 : 6, { duration: 150 }),
+      withTiming(isDark ? 5 : 3, {
+        duration: 150,
+        easing: Easing.bezier(0.25, 1, 0.5, 1),
+      })
+    );
+
+    // Smoother rotation animation
     rotate.value = withTiming(newValue, {
-      duration: 500,
-      easing: Easing.bezier(0.32, 0, 0.67, 1),
+      duration: 600,
+      easing: Easing.bezier(0.25, 1, 0.5, 1),
     });
+
     setIsFlipped(!isFlipped);
   };
 
-  const frontAnimatedStyle = useAnimatedStyle<any>(() => {
+  // Enhanced front card animation
+  const frontAnimatedStyle = useAnimatedStyle(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [0, 180]);
     const zIndex = rotate.value > 0.5 ? -1 : 1;
+    const shadowOpacity = interpolate(rotate.value, [0, 0.5], [0.15, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
 
     return {
       transform: [
-        { perspective: 1000 },
+        { perspective: 1200 },
         { rotateY: `${rotateValue}deg` },
         { scale: scale.value },
-        { translateZ: rotate.value > 0.5 ? -10 : 0 },
       ],
       opacity: rotate.value > 0.5 ? 0 : 1,
       position: "absolute",
@@ -70,19 +91,30 @@ export function FlashcardItem({
       height: "100%",
       backfaceVisibility: "hidden",
       zIndex,
+
+      // Enhanced shadows for better depth
+      shadowColor: isDark ? "#000" : "rgba(0,0,0,0.4)",
+      shadowOffset: { width: 0, height: isDark ? 3 : 2 },
+      shadowOpacity,
+      shadowRadius: elevation.value,
+      elevation: elevation.value,
     };
   });
 
-  const backAnimatedStyle = useAnimatedStyle<any>(() => {
+  // Enhanced back card animation
+  const backAnimatedStyle = useAnimatedStyle(() => {
     const rotateValue = interpolate(rotate.value, [0, 1], [180, 360]);
     const zIndex = rotate.value < 0.5 ? -1 : 1;
+    const shadowOpacity = interpolate(rotate.value, [0.5, 1], [0, 0.15], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
 
     return {
       transform: [
-        { perspective: 1000 },
+        { perspective: 1200 },
         { rotateY: `${rotateValue}deg` },
         { scale: scale.value },
-        { translateZ: rotate.value < 0.5 ? -10 : 0 },
       ],
       opacity: rotate.value < 0.5 ? 0 : 1,
       position: "absolute",
@@ -90,28 +122,37 @@ export function FlashcardItem({
       height: "100%",
       backfaceVisibility: "hidden",
       zIndex,
+
+      // Enhanced shadows for better depth
+      shadowColor: isDark ? "#000" : "rgba(0,0,0,0.4)",
+      shadowOffset: { width: 0, height: isDark ? 3 : 2 },
+      shadowOpacity,
+      shadowRadius: elevation.value,
+      elevation: elevation.value,
     };
   });
 
-  // Déterminer la couleur de la boîte
-  const boxColor = colors.boxColors[flashcard.boxLevel as keyof typeof colors.boxColors];
+  // Get the box color for visual indication
+  const boxColor =
+    colors.boxColors[flashcard.boxLevel as keyof typeof colors.boxColors];
 
-  // Vérifier si la carte est due
+  // Check if card needs review
   const isDue = flashcard.nextReviewDate <= new Date();
 
   return (
     <View style={styles.container}>
       <View style={styles.cardContainer}>
         <AnimatedTouchableOpacity
-          activeOpacity={0.9}
+          activeOpacity={0.95}
           onPress={flipCard}
-          style={{ width: "100%", height: 180 }}
+          style={{ width: "100%", height: 190 }}
         >
+          {/* Front of card */}
           <Animated.View style={[styles.cardSide, frontAnimatedStyle]}>
             <Card variant={isDark ? "default" : "elevated"} style={styles.card}>
               <LinearGradient
                 colors={
-                  isDark ? ["#1d2529", "#293238"] : ["#ffffff", "#f5f5f5"]
+                  isDark ? ["#1d2529", "#293238"] : ["#ffffff", "#f9f9f9"]
                 }
                 style={styles.cardGradient}
                 start={{ x: 0, y: 0 }}
@@ -161,6 +202,7 @@ export function FlashcardItem({
             </Card>
           </Animated.View>
 
+          {/* Back of card */}
           <Animated.View style={[styles.cardSide, backAnimatedStyle]}>
             <Card
               variant={isDark ? "default" : "elevated"}
@@ -168,7 +210,7 @@ export function FlashcardItem({
             >
               <LinearGradient
                 colors={
-                  isDark ? ["#293238", "#1d2529"] : ["#f5f5f5", "#ffffff"]
+                  isDark ? ["#293238", "#1d2529"] : ["#f9f9f9", "#ffffff"]
                 }
                 style={styles.cardGradient}
                 start={{ x: 0, y: 0 }}
@@ -201,7 +243,7 @@ export function FlashcardItem({
                   </View>
 
                   <ThemedText style={styles.cardTitle}>Réponse</ThemedText>
-                  <ThemedText style={styles.cardText} numberOfLines={3}>
+                  <ThemedText style={styles.cardText} numberOfLines={4}>
                     {flashcard.answer}
                   </ThemedText>
 
@@ -251,9 +293,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   cardContainer: {
-    height: 180,
+    height: 190,
     position: "relative",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardSide: {
     width: "100%",
@@ -264,6 +306,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     overflow: "hidden",
+    borderRadius: 16,
   },
   cardGradient: {
     flex: 1,
@@ -282,9 +325,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   boxIndicator: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   boxText: {
     color: "#fff",
@@ -294,10 +337,10 @@ const styles = StyleSheet.create({
   dueIndicator: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(244, 67, 54, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: "rgba(244, 67, 54, 0.15)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   dueText: {
     color: "#ff3d00",
@@ -306,13 +349,15 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
     color: "#666",
     marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   cardText: {
-    fontSize: 16,
+    fontSize: 17,
     lineHeight: 24,
     flex: 1,
   },
@@ -334,6 +379,7 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    marginTop: 4,
   },
   editButton: {
     marginRight: 8,

@@ -3,8 +3,15 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/context/ThemeContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { ReactNode } from "react";
-import { Pressable, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  TextStyle,
+  ViewStyle,
+} from "react-native";
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -23,6 +30,8 @@ interface CardProps {
   gradientStart?: { x: number; y: number };
   gradientEnd?: { x: number; y: number };
   pressable?: boolean;
+  fullWidth?: boolean;
+  compact?: boolean;
 }
 
 interface CardHeaderProps {
@@ -33,6 +42,7 @@ interface CardHeaderProps {
 interface CardContentProps {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  padded?: boolean;
 }
 
 interface CardFooterProps {
@@ -42,19 +52,37 @@ interface CardFooterProps {
 
 interface CardTitleProps {
   children: ReactNode;
-  style?: StyleProp<ViewStyle>;
+  style?: StyleProp<TextStyle>;
 }
 
 function CardHeader({ children, style }: CardHeaderProps) {
-  return <ThemedView style={[styles.header, style]}>{children}</ThemedView>;
+  const { colors } = useTheme();
+  return (
+    <ThemedView
+      style={[styles.header, { borderBottomColor: colors.border }, style]}
+    >
+      {children}
+    </ThemedView>
+  );
 }
 
-function CardContent({ children, style }: CardContentProps) {
-  return <ThemedView style={[styles.content, style]}>{children}</ThemedView>;
+function CardContent({ children, style, padded = true }: CardContentProps) {
+  return (
+    <ThemedView style={[styles.content, !padded && styles.noPadding, style]}>
+      {children}
+    </ThemedView>
+  );
 }
 
 function CardFooter({ children, style }: CardFooterProps) {
-  return <ThemedView style={[styles.footer, style]}>{children}</ThemedView>;
+  const { colors } = useTheme();
+  return (
+    <ThemedView
+      style={[styles.footer, { borderTopColor: colors.border }, style]}
+    >
+      {children}
+    </ThemedView>
+  );
 }
 
 function CardTitle({ children, style }: CardTitleProps) {
@@ -71,29 +99,50 @@ export function Card({
   gradientStart = { x: 0, y: 0 },
   gradientEnd = { x: 1, y: 1 },
   pressable = true,
+  fullWidth = false,
+  compact = false,
 }: CardProps) {
   const { colors, isDark } = useTheme();
   const scale = useSharedValue(1);
+  const backgroundColor = useSharedValue(0);
 
-  // Animation de pression
+  // Enhanced animation for press feedback
   const handlePressIn = () => {
     if (pressable && onPress) {
       scale.value = withTiming(0.98, { duration: 100 });
+      backgroundColor.value = withTiming(1, { duration: 200 });
     }
   };
 
   const handlePressOut = () => {
     if (pressable && onPress) {
-      scale.value = withTiming(1, { duration: 200 });
+      scale.value = withTiming(1, { duration: 300 });
+      backgroundColor.value = withTiming(0, { duration: 300 });
     }
   };
 
+  // Enhanced animations with smoother transitions
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  // Styles selon la variante
+  // Enhanced background color animation
+  const animatedBackgroundStyle = useAnimatedStyle(() => {
+    if (variant === "gradient") return {};
+
+    const bgColor = interpolateColor(
+      backgroundColor.value,
+      [0, 1],
+      [colors.card, isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)"]
+    );
+
+    return { backgroundColor: bgColor };
+  });
+
+  // Enhanced variant styles with better shadows and depth
   const getVariantStyle = () => {
+    const baseElevation = compact ? Math.max(1, elevation - 1) : elevation;
+
     switch (variant) {
       case "outlined":
         return {
@@ -106,10 +155,10 @@ export function Card({
         return {
           backgroundColor: colors.card,
           shadowColor: isDark ? "#000000" : colors.shadow,
-          shadowOffset: { width: 0, height: elevation },
-          shadowOpacity: isDark ? 0.5 : 0.1,
-          shadowRadius: elevation * 2,
-          elevation: elevation,
+          shadowOffset: { width: 0, height: baseElevation },
+          shadowOpacity: isDark ? 0.7 : 0.15,
+          shadowRadius: baseElevation * 2,
+          elevation: baseElevation * 2,
         };
       case "gradient":
         return {
@@ -119,20 +168,20 @@ export function Card({
         return {
           backgroundColor: colors.card,
           shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.1,
-          shadowRadius: 2,
-          elevation: 2,
+          shadowOffset: { width: 0, height: baseElevation * 0.5 },
+          shadowOpacity: isDark ? 0.3 : 0.1,
+          shadowRadius: baseElevation,
+          elevation: baseElevation,
         };
     }
   };
 
   const variantStyle = getVariantStyle();
   const defaultGradientColors = isDark
-    ? colors.gradientPrimary
+    ? [colors.backgroundSecondary, colors.backgroundTertiary]
     : ["#FFFFFF", "#F8F9FA"];
 
-  // Rendu conditionnel selon la variante
+  // Render conditional gradient card
   const renderCard = () => {
     if (variant === "gradient") {
       return (
@@ -146,7 +195,14 @@ export function Card({
           }
           start={gradientStart}
           end={gradientEnd}
-          style={[styles.container, variantStyle, style, animatedStyle]}
+          style={[
+            styles.container,
+            compact ? styles.compactContainer : null,
+            variantStyle,
+            fullWidth && styles.fullWidth,
+            style,
+            animatedStyle,
+          ]}
         >
           {children}
         </AnimatedLinearGradient>
@@ -154,33 +210,41 @@ export function Card({
     }
 
     return (
-      <ThemedView
-        style={[styles.container, variantStyle, style, animatedStyle]}
+      <Animated.View
+        style={[
+          styles.container,
+          compact ? styles.compactContainer : null,
+          variantStyle,
+          fullWidth && styles.fullWidth,
+          style,
+          animatedStyle,
+          animatedBackgroundStyle,
+        ]}
       >
         {children}
-      </ThemedView>
+      </Animated.View>
     );
   };
 
-  // Si la carte est pressable, on l'entoure d'un Pressable animé
+  // Enhanced pressable card with better animations
   if (onPress) {
     return (
       <AnimatedPressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={animatedStyle}
+        style={[fullWidth && styles.fullWidth]}
       >
         {renderCard()}
       </AnimatedPressable>
     );
   }
 
-  // Sinon on retourne simplement la carte
+  // Standard card without press interactions
   return renderCard();
 }
 
-// Composants enfants
+// Composable card subcomponents
 Card.Header = CardHeader;
 Card.Content = CardContent;
 Card.Footer = CardFooter;
@@ -188,28 +252,37 @@ Card.Title = CardTitle;
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     marginVertical: 8,
+  },
+  compactContainer: {
+    borderRadius: 12,
+    marginVertical: 6,
+  },
+  fullWidth: {
+    width: "100%",
   },
   header: {
     padding: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   content: {
     padding: 16,
+  },
+  noPadding: {
+    padding: 0,
   },
   footer: {
     padding: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(0,0,0,0.1)",
   },
   title: {
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 8,
+    letterSpacing: -0.3,
   },
 });

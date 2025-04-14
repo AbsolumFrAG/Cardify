@@ -1,4 +1,4 @@
-import { upsertVector } from "@/api/pinecone";
+import { upsertVector } from "@/api/cardifyApi";
 import {
   getCourseContentById,
   getCourseContents,

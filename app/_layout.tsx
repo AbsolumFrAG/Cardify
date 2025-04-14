@@ -102,15 +102,6 @@ export default function RootLayout() {
                     headerShown: true,
                   }}
                 />
-                <Stack.Screen
-                  name="search"
-                  options={{
-                    title: "Rechercher",
-                    presentation: "modal",
-                    animation: "slide_from_bottom",
-                    headerShown: true,
-                  }}
-                />
               </Stack>
               <StatusBar style="auto" />
             </FlashcardProvider>
